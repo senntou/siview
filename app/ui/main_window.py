@@ -1,8 +1,54 @@
-from PySide6.QtWidgets import (
-    QWidget, QLabel, QTextEdit, QHBoxLayout
-)
-from PySide6.QtGui import QPixmap, QImage
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QSplitter, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QThread, Signal
+
+from sftp.client import SFTPClientWrapper
+from ui.file_list_panel import FileListPanel
+from ui.image_viewer import ImageViewer
+
+
+class SFTPConnectWorker(QThread):
+    """SFTP接続を行うワーカースレッド"""
+    connected = Signal(str)  # 接続完了時に初期パスを送信
+    error = Signal(str)      # エラー発生時
+
+    def __init__(self, host: str, parent=None):
+        super().__init__(parent)
+        self.host = host
+        self.client: SFTPClientWrapper | None = None
+
+    def run(self):
+        try:
+            self.client = SFTPClientWrapper(self.host)
+            initial_path = self.client.pwd()
+            self.connected.emit(initial_path)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class SFTPListWorker(QThread):
+    """ファイル一覧を取得するワーカースレッド"""
+    finished = Signal(str, list)  # (path, entries) entries: list of dict
+    error = Signal(str)
+
+    def __init__(self, client: SFTPClientWrapper, path: str, parent=None):
+        super().__init__(parent)
+        self.client = client
+        self.path = path
+
+    def run(self):
+        try:
+            entries = self.client.ls(self.path)
+            entries.sort()
+
+            result = []
+            for name in entries:
+                full_path = f"{self.path}/{name}"
+                is_dir = self.client.is_dir(full_path)
+                result.append({"name": name, "is_dir": is_dir})
+
+            self.finished.emit(self.path, result)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class MainWindow(QWidget):
@@ -12,67 +58,130 @@ class MainWindow(QWidget):
         self.setWindowTitle("SIView")
         self.setGeometry(300, 100, 1200, 800)
 
-        # 左：テキスト表示
-        self.text_view = QTextEdit()
-        self.text_view.setReadOnly(True)
+        # SFTP関連（非同期で初期化）
+        self.client: SFTPClientWrapper | None = None
+        self.current_path: str | None = None
+        self._loading = False
 
-        # 右：画像表示
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumSize(200, 200)
+        # UI コンポーネント
+        self.file_list_panel = FileListPanel()
+        self.image_viewer = ImageViewer()
 
-        self._pixmap = None  # 元画像保持用
+        # Splitter
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self.file_list_panel)
+        splitter.addWidget(self.image_viewer)
+        splitter.setSizes([1, 5])
 
-        # レイアウト
-        layout = QHBoxLayout()
-        layout.addWidget(self.text_view, 1)
-        layout.addWidget(self.image_label, 1)
-        self.setLayout(layout)
+        layout = QVBoxLayout(self)
+        layout.addWidget(splitter)
 
-    # ---------- 左側 ----------
-    def set_file_list(self, file_list):
-        """
-        file_list: list[str]
-        """
-        self.text_view.clear()
-        self.text_view.setPlainText("\n".join(file_list))
+        # ワーカー参照を保持（GC防止）
+        self._connect_worker: SFTPConnectWorker | None = None
+        self._list_worker: SFTPListWorker | None = None
 
-    # ---------- 右側 ----------
-    def set_image(self, image):
-        """
-        image: str (path) | QImage | QPixmap
-        """
-        if isinstance(image, str):
-            pixmap = QPixmap(image)
-        elif isinstance(image, QImage):
-            pixmap = QPixmap.fromImage(image)
-        elif isinstance(image, QPixmap):
-            pixmap = image
+        # 初期状態：ローディング表示
+        self.file_list_panel.set_message("接続中...")
+
+        # 非同期でSFTP接続を開始
+        self._start_connect()
+
+    def _start_connect(self):
+        """SFTP接続を非同期で開始"""
+        self._connect_worker = SFTPConnectWorker("kronecker", self)
+        self._connect_worker.connected.connect(self._on_connected)
+        self._connect_worker.error.connect(self._on_connect_error)
+        self._connect_worker.start()
+
+    def _on_connected(self, initial_path: str):
+        """SFTP接続完了時のコールバック"""
+        if self._connect_worker is None:
+            raise RuntimeError("Connected but worker is None")
+        self.client = self._connect_worker.client
+        self.current_path = initial_path
+        self._refresh_file_list()
+
+    def _on_connect_error(self, error_msg: str):
+        """SFTP接続エラー時のコールバック"""
+        self.file_list_panel.set_message(f"接続エラー: {error_msg}")
+
+    def _refresh_file_list(self):
+        """現在のディレクトリのファイル一覧を非同期で更新"""
+        if self.client is None or self._loading:
+            return
+
+        self._loading = True
+        self.file_list_panel.set_message("読み込み中...")
+
+        if self.current_path is None:
+            raise RuntimeError("Current path is None while refreshing file list")
+
+        self._list_worker = SFTPListWorker(self.client, self.current_path, self)
+        self._list_worker.finished.connect(self._on_list_finished)
+        self._list_worker.error.connect(self._on_list_error)
+        self._list_worker.start()
+
+    def _on_list_finished(self, path: str, entries: list):
+        """ファイル一覧取得完了時のコールバック"""
+        self._loading = False
+        self.file_list_panel.set_entries(entries)
+        self.setWindowTitle(f"SIView - {path}")
+
+    def _on_list_error(self, error_msg: str):
+        """ファイル一覧取得エラー時のコールバック"""
+        self._loading = False
+        self.file_list_panel.set_message(f"エラー: {error_msg}")
+
+    def _go_parent(self):
+        """親ディレクトリに移動"""
+        if self._loading or self.current_path is None or self.current_path == "/":
+            return
+
+        # 親ディレクトリを計算
+        parent = "/".join(self.current_path.rstrip("/").split("/")[:-1])
+        if not parent:
+            parent = "/"
+
+        self.current_path = parent
+        self._refresh_file_list()
+
+    def _enter_directory(self):
+        """選択中のディレクトリに入る"""
+        if self._loading or self.current_path is None:
+            return
+
+        entry = self.file_list_panel.current_entry()
+        if entry is None or not entry["is_dir"]:
+            return
+
+        # ディレクトリに移動
+        name = entry["name"]
+        if self.current_path == "/":
+            self.current_path = f"/{name}"
         else:
-            raise TypeError("Unsupported image type")
+            self.current_path = f"{self.current_path}/{name}"
 
-        self._pixmap = pixmap
-        self._update_image()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._update_image()
+        self._refresh_file_list()
 
     def keyPressEvent(self, event):
-        """キー入力イベントの処理"""
-        if event.key() == Qt.Key_Q:
+        """キー入力イベントの処理（Vim風キーバインド）"""
+        key = event.key()
+
+        if key == Qt.Key.Key_Q:
             self.close()
+        elif key == Qt.Key.Key_J:
+            self.file_list_panel.move_cursor(1)
+        elif key == Qt.Key.Key_K:
+            self.file_list_panel.move_cursor(-1)
+        elif key == Qt.Key.Key_H:
+            self._go_parent()
+        elif key == Qt.Key.Key_L:
+            self._enter_directory()
         else:
             super().keyPressEvent(event)
 
-    def _update_image(self):
-        if self._pixmap is None:
-            return
-
-        scaled = self._pixmap.scaled(
-            self.image_label.size(),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
-        )
-        self.image_label.setPixmap(scaled)
-
+    def closeEvent(self, event):
+        """ウィンドウを閉じるときにSFTP接続をクローズ"""
+        if self.client is not None:
+            self.client.close()
+        super().closeEvent(event)

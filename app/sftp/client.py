@@ -56,6 +56,23 @@ class SFTPClientWrapper:
         """
         return self.sftp.listdir(path)
 
+    def pwd(self) -> str:
+        """現在のワーキングディレクトリを返す"""
+        return self.sftp.getcwd() or self.sftp.normalize(".")
+
+    def chdir(self, path: str):
+        """ワーキングディレクトリを変更"""
+        self.sftp.chdir(path)
+
+    def is_dir(self, path: str) -> bool:
+        """パスがディレクトリかどうかを判定"""
+        import stat
+        try:
+            mode = self.sftp.stat(path).st_mode
+            return stat.S_ISDIR(mode)
+        except IOError:
+            return False
+
     def get_file(self, remote_path: str) -> Tuple[bytes, str]:
         """
         ファイルをメモリに取得
