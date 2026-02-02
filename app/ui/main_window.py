@@ -1,7 +1,9 @@
+from PySide6.QtGui import QFont, QImage
 from PySide6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, QThread, Signal
 
 from sftp.client import SFTPClientWrapper
+from image.loader import ImageLoader
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
 
@@ -51,6 +53,26 @@ class SFTPListWorker(QThread):
             self.error.emit(str(e))
 
 
+class SFTPFileWorker(QThread):
+    """ファイルを取得して画像として読み込むワーカースレッド"""
+    finished = Signal(QImage, str)  # (image, filename)
+    error = Signal(str)
+
+    def __init__(self, client: SFTPClientWrapper, remote_path: str, parent=None):
+        super().__init__(parent)
+        self.client = client
+        self.remote_path = remote_path
+        self._loader = ImageLoader()
+
+    def run(self):
+        try:
+            data, filename = self.client.get_file(self.remote_path)
+            image = self._loader.load(data, filename)
+            self.finished.emit(image, filename)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class MainWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,6 +101,10 @@ class MainWindow(QWidget):
         # ワーカー参照を保持（GC防止）
         self._connect_worker: SFTPConnectWorker | None = None
         self._list_worker: SFTPListWorker | None = None
+        self._file_worker: SFTPFileWorker | None = None
+
+        # キーシーケンス用（gg等の連続キー入力）
+        self._pending_key: str | None = None
 
         # 初期状態：ローディング表示
         self.file_list_panel.set_message("接続中...")
@@ -163,20 +189,78 @@ class MainWindow(QWidget):
 
         self._refresh_file_list()
 
+    def _open_file(self):
+        """選択中のファイルを開いて画像として表示"""
+        if self._loading or self.client is None or self.current_path is None:
+            return
+
+        entry = self.file_list_panel.current_entry()
+        if entry is None or entry["is_dir"]:
+            return
+
+        # ファイルのフルパスを構築
+        name = entry["name"]
+        if self.current_path == "/":
+            remote_path = f"/{name}"
+        else:
+            remote_path = f"{self.current_path}/{name}"
+
+        # 非同期でファイルを取得
+        self._file_worker = SFTPFileWorker(self.client, remote_path, self)
+        self._file_worker.finished.connect(self._on_file_loaded)
+        self._file_worker.error.connect(self._on_file_error)
+        self._file_worker.start()
+
+    def _on_file_loaded(self, image: QImage, filename: str):
+        """ファイル読み込み完了時のコールバック"""
+        self.image_viewer.set_image(image)
+
+    def _on_file_error(self, error_msg: str):
+        """ファイル読み込みエラー時のコールバック"""
+        self.image_viewer.set_text(f"エラー: {error_msg}")
+
     def keyPressEvent(self, event):
         """キー入力イベントの処理（Vim風キーバインド）"""
         key = event.key()
+        modifiers = event.modifiers()
 
+        # ggシーケンスの処理
+        if self._pending_key == "g":
+            self._pending_key = None
+            if key == Qt.Key.Key_G:
+                self.file_list_panel.go_top()
+                return
+            # gの後に別のキーが来た場合は無視して続行
+
+        # Ctrl修飾キー
+        if modifiers == Qt.KeyboardModifier.ControlModifier:
+            if key == Qt.Key.Key_D:
+                self.file_list_panel.move_cursor(15)
+                return
+            elif key == Qt.Key.Key_U:
+                self.file_list_panel.move_cursor(-15)
+                return
+
+        # 通常キー
         if key == Qt.Key.Key_Q:
             self.close()
         elif key == Qt.Key.Key_J:
-            self.file_list_panel.move_cursor(1)
+            self.file_list_panel.move_cursor_wrap(1)
         elif key == Qt.Key.Key_K:
-            self.file_list_panel.move_cursor(-1)
+            self.file_list_panel.move_cursor_wrap(-1)
         elif key == Qt.Key.Key_H:
             self._go_parent()
         elif key == Qt.Key.Key_L:
             self._enter_directory()
+        elif key == Qt.Key.Key_O:
+            self._open_file()
+        elif key == Qt.Key.Key_G:
+            if modifiers == Qt.KeyboardModifier.ShiftModifier:
+                # Shift+G (大文字G) で一番下
+                self.file_list_panel.go_bottom()
+            else:
+                # 小文字g: ggシーケンスの開始
+                self._pending_key = "g"
         else:
             super().keyPressEvent(event)
 
