@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QFrame, QListView, QVBoxLayout
 from PySide6.QtCore import Qt
+from natsort import natsort_keygen
 
 from const import (
     BG_DEFAULT, BG_FOCUSED, FONT_SIZE, TEXT_DEFAULT, TEXT_SELECTED,
@@ -73,7 +74,10 @@ class FileListPanel(QFrame):
         self._entries = entries
 
         # ディレクトリ > ファイルの順にソート、名前順にソート
-        entries.sort(key=lambda e: (not e["is_dir"], e["name"].lower()))
+        natkey = natsort_keygen(key=lambda s: s.lower())
+        entries.sort(
+            key=lambda e: (not e["is_dir"], natkey(e["name"]))
+        )
 
         # 表示用の文字列リストを作成
         display_list = []
