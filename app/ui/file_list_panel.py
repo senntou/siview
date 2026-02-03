@@ -15,6 +15,10 @@ class FileListPanel(QListView):
         self.setModel(self._model)
         self.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
 
+        # スクロールバーを非表示
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
 
     def set_entries(self, entries: list[dict]):

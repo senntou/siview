@@ -101,15 +101,17 @@ class MainWindow(QWidget):
         self.file_list_panel = FileListPanel()
         self.image_viewer = ImageViewer()
 
+        self._init_keymap()
+
         # Splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.file_list_panel)
-        splitter.addWidget(self.image_viewer)
-        splitter.setSizes([200, 1000])
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.addWidget(self.file_list_panel)
+        self.splitter.addWidget(self.image_viewer)
+        self.splitter.setSizes([200, 1000])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(splitter)
+        layout.addWidget(self.splitter)
 
         # ワーカー参照を保持（GC防止）
         self._connect_worker: ServerConnectWorker | None = None
@@ -124,6 +126,15 @@ class MainWindow(QWidget):
 
         # 非同期でサーバー接続を開始
         self._start_connect()
+
+    def _move_splitter(self, delta: int):
+        """スプリッターの位置を調整"""
+        sizes = self.splitter.sizes()
+        total = sum(sizes)
+        ratio = sizes[0] / total
+        new_ratio = (ratio + delta * 0.01)
+        new_ratio = max(0.1, min(0.9, new_ratio))  # 制限
+        self.splitter.setSizes([int(new_ratio * total), int((1 - new_ratio) * total)])
 
     def _start_connect(self):
         """サーバーセットアップを非同期で開始"""
@@ -246,50 +257,72 @@ class MainWindow(QWidget):
         """ファイル読み込みエラー時のコールバック"""
         self.image_viewer.set_text(f"エラー: {error_msg}")
 
+    def _init_keymap(self):
+        self._pending_key = None
+
+        self._keymap = {
+            # Ctrl
+            ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
+            ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
+
+            # Normal
+            (Qt.Key.Key_Q,): self.close,
+            (Qt.Key.Key_J,): lambda: self.file_list_panel.move_cursor_wrap(1),
+            (Qt.Key.Key_K,): lambda: self.file_list_panel.move_cursor_wrap(-1),
+            (Qt.Key.Key_H,): self._go_parent,
+            (Qt.Key.Key_L,): self._enter_directory,
+            (Qt.Key.Key_O,): self._open_file,
+
+            # Shift
+            ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
+            ("Shift", Qt.Key.Key_H): lambda: self._move_splitter(-3),
+            ("Shift", Qt.Key.Key_L): lambda: self._move_splitter(3),
+        }
+
+        self._sequences = {
+            (Qt.Key.Key_G, Qt.Key.Key_G): self.file_list_panel.go_top,  # gg
+        }
+
+
     def keyPressEvent(self, event):
-        """キー入力イベントの処理（Vim風キーバインド）"""
-        key = event.key()
-        modifiers = event.modifiers()
+        """Vim風キーバインド（Ctrl / Shift / シーケンスを一般化）"""
 
-        # ggシーケンスの処理
-        if self._pending_key == "g":
+        # ---------- キー正規化 ----------
+        parts = []
+        mods = event.modifiers()
+
+        if mods & Qt.KeyboardModifier.ControlModifier:
+            parts.append("Ctrl")
+        if mods & Qt.KeyboardModifier.ShiftModifier:
+            parts.append("Shift")
+
+        parts.append(event.key())
+        key_id = tuple(parts)
+
+        # ---------- シーケンス処理 ----------
+        if self._pending_key is not None:
+            seq = (self._pending_key, event.key())
             self._pending_key = None
-            if key == Qt.Key.Key_G:
-                self.file_list_panel.go_top()
-                return
-            # gの後に別のキーが来た場合は無視して続行
 
-        # Ctrl修飾キー
-        if modifiers == Qt.KeyboardModifier.ControlModifier:
-            if key == Qt.Key.Key_D:
-                self.file_list_panel.move_cursor(15)
+            action = self._sequences.get(seq)
+            if action:
+                action()
                 return
-            elif key == Qt.Key.Key_U:
-                self.file_list_panel.move_cursor(-15)
-                return
+            # 失敗したら通常処理へ落とす
 
-        # 通常キー
-        if key == Qt.Key.Key_Q:
-            self.close()
-        elif key == Qt.Key.Key_J:
-            self.file_list_panel.move_cursor_wrap(1)
-        elif key == Qt.Key.Key_K:
-            self.file_list_panel.move_cursor_wrap(-1)
-        elif key == Qt.Key.Key_H:
-            self._go_parent()
-        elif key == Qt.Key.Key_L:
-            self._enter_directory()
-        elif key == Qt.Key.Key_O:
-            self._open_file()
-        elif key == Qt.Key.Key_G:
-            if modifiers == Qt.KeyboardModifier.ShiftModifier:
-                # Shift+G (大文字G) で一番下
-                self.file_list_panel.go_bottom()
-            else:
-                # 小文字g: ggシーケンスの開始
-                self._pending_key = "g"
-        else:
-            super().keyPressEvent(event)
+        # ---------- 通常キー処理 ----------
+        action = self._keymap.get(key_id)
+        if action:
+            action()
+            return
+
+        # ---------- シーケンス開始 ----------
+        if key_id == (Qt.Key.Key_G,):
+            self._pending_key = Qt.Key.Key_G
+            return
+
+        super().keyPressEvent(event)
+
 
     def closeEvent(self, event):
         """ウィンドウを閉じるときにサーバーをクリーンアップ"""
