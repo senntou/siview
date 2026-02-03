@@ -199,7 +199,7 @@ class MainWindow(QWidget):
     def _on_list_error(self, error_msg: str):
         """ファイル一覧取得エラー時のコールバック"""
         self._loading = False
-        self.file_list_panel.set_message(f"エラー: {error_msg}")
+        self.file_list_panel.set_message(f"ファイル一覧取得エラー: {error_msg}")
 
     def _go_parent(self):
         """親ディレクトリに移動"""
@@ -330,7 +330,7 @@ class MainWindow(QWidget):
 
     def _on_file_error(self, error_msg: str):
         """ファイル読み込みエラー時のコールバック"""
-        self.image_viewer.set_text(f"エラー: {error_msg}")
+        self.image_viewer.set_text(f"画像読み込みエラー: {error_msg}")
 
     def _init_keymap(self):
         self._pending_key = None
