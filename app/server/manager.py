@@ -123,6 +123,16 @@ class ServerManager:
 
         sftp = self.ssh.open_sftp()
 
+        # 既に存在する場合、デプロイはスキップ
+        try:
+            remote_path = f"{self.REMOTE_DIR}/{self.REMOTE_BINARY}"
+            sftp.stat(remote_path)
+            sftp.close()
+            print("[DEBUG] Binary already deployed, skipping deployment.", flush=True)
+            return
+        except FileNotFoundError:
+            pass
+
         # リモートディレクトリを作成
         remote_dir = self.REMOTE_DIR
         try:
