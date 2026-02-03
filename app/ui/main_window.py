@@ -106,6 +106,9 @@ class MainWindow(QWidget):
         # UI コンポーネント
         self._current_display_path = ""  # 省略表示用にフルパスを保持
 
+        # カレントパス毎に、カーソルのインデックスを保存する
+        self._path_cursor_map: dict[str, int] = {}
+
         self.path_label = QLabel()
         self.path_label.setObjectName("pathLabel")
         self.path_label.setStyleSheet(f"""
@@ -233,7 +236,8 @@ class MainWindow(QWidget):
     def _on_list_finished(self, path: str, entries: list):
         """ファイル一覧取得完了時のコールバック"""
         self._loading = False
-        self.file_list_panel.set_entries(entries)
+        idx = self._path_cursor_map.get(path, 0)
+        self.file_list_panel.set_entries(entries, idx)
         self.setWindowTitle(f"SIView - {self.host}:{path}")
         self._set_path_label(path)
 
@@ -294,6 +298,16 @@ class MainWindow(QWidget):
             self.current_path = f"{self.current_path}/{name}"
 
         self._refresh_file_list()
+    
+    def _move_file_cursor(self, delta: int):
+        """ファイルリストのカーソルを移動"""
+        if self._loading:
+            return
+
+        new_row = self.file_list_panel.move_cursor_wrap(delta)
+        # カーソル位置を保存
+        if self.current_path is not None:
+            self._path_cursor_map[self.current_path] = new_row
 
     def _add_image_to_list(self):
         """選択中のファイルを画像リストに追加"""
@@ -400,8 +414,8 @@ class MainWindow(QWidget):
         # モード別キーマップ
         self._mode_keymaps = {
             "file_list": {
-                (Qt.Key.Key_J,): lambda: self.file_list_panel.move_cursor_wrap(1),
-                (Qt.Key.Key_K,): lambda: self.file_list_panel.move_cursor_wrap(-1),
+                (Qt.Key.Key_J,): lambda: self._move_file_cursor(1),
+                (Qt.Key.Key_K,): lambda: self._move_file_cursor(-1),
                 (Qt.Key.Key_H,): self._go_parent,
                 (Qt.Key.Key_L,): self._enter_directory,
                 (Qt.Key.Key_O,): self._add_image_to_list,

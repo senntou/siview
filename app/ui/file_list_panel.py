@@ -68,7 +68,7 @@ class FileListPanel(QFrame):
             }}
         """)
 
-    def set_entries(self, entries: list[dict]):
+    def set_entries(self, entries: list[dict], idx: int = 0):
         """ファイルエントリを設定して表示を更新"""
         self._entries = entries
 
@@ -85,9 +85,9 @@ class FileListPanel(QFrame):
 
         self._model.set_entries(entries)
 
-        # 最初のアイテムを選択
+        # カーソル位置を設定
         if len(display_list) > 0:
-            self._list_view.setCurrentIndex(self._model.index(0, 0))
+            self.set_current_row(idx)
 
     def set_message(self, message: str):
         """単一メッセージを表示（ローディング、エラー等）"""
@@ -109,14 +109,15 @@ class FileListPanel(QFrame):
         current = self.current_row()
         self.set_current_row(current + delta)
 
-    def move_cursor_wrap(self, delta: int):
+    def move_cursor_wrap(self, delta: int) -> int:
         """カーソルを上下に移動（端で折り返す）"""
         count = self._model.rowCount()
         if count == 0:
-            return
+            return 0
         current = self.current_row()
         new_row = (current + delta) % count
         self.set_current_row(new_row)
+        return new_row
 
     def go_top(self):
         """一番上に移動"""
