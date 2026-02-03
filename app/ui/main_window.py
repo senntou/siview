@@ -20,7 +20,7 @@ class MainWindow(QWidget):
 
         self.host = host
         self.setWindowTitle(f"SIView - {host}")
-        self.setGeometry(300, 100, 1200, 800)
+        self.setGeometry(100, 100, 800, 600)
         self.setStyleSheet("""
             #imageLabel {
                 background-color: #1e1e1e;
