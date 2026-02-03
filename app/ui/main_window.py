@@ -7,6 +7,7 @@ from api.client import HTTPClient
 from image.loader import ImageLoader
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
+from util.loader import load_stylesheet
 
 
 class ServerConnectWorker(QThread):
@@ -82,6 +83,7 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("SIView")
         self.setGeometry(300, 100, 1200, 800)
+        self.setStyleSheet(load_stylesheet("style/main.qss"))
 
         # サーバー・HTTP関連（非同期で初期化）
         self.manager: ServerManager | None = None

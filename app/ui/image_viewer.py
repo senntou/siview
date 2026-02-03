@@ -9,16 +9,20 @@ class ImageViewer(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.setObjectName("imageViewer")
         self._pixmap: QPixmap | None = None
 
         # 画像表示
         self.image_label = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setObjectName("imageLabel")
 
         # テキスト表示
         self.text_view = QTextEdit(readOnly=True)
+        self.text_view.setObjectName("textView")
 
         # レイアウト
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.image_label, 4)
         layout.addWidget(self.text_view, 1)
 

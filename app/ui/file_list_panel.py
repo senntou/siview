@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QListView
-from PySide6.QtCore import QStringListModel, Qt, Signal
+from PySide6.QtCore import QStringListModel, Qt
 
 
 class FileListPanel(QListView):
@@ -8,30 +8,13 @@ class FileListPanel(QListView):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.setObjectName("fileListPanel")
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # キーイベントを親で処理
-        self._init_style()
 
         self._model = QStringListModel()
         self.setModel(self._model)
 
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
-
-    def _init_style(self):
-        """スタイルの初期化"""
-        self.setStyleSheet("""
-            QListView {
-                background-color: #1e1e1e;
-                color: #dddddd;
-                border: none;
-            }
-            QListView::item {
-                padding: 6px;
-            }
-            QListView::item:selected {
-                background-color: #007acc;
-                color: white;
-            }
-        """)
 
     def set_entries(self, entries: list[dict]):
         """ファイルエントリを設定して表示を更新"""
