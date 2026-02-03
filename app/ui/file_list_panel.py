@@ -15,6 +15,7 @@ class FileListPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self.font_size = 18
         self.setObjectName("fileListPanel")
 
         # 枠線設定
@@ -43,6 +44,15 @@ class FileListPanel(QFrame):
 
         self._update_style(False)
 
+    def get_font_size(self) -> int:
+        """フォントサイズを取得"""
+        return self.font_size
+
+    def set_font_size(self, size: int):
+        """フォントサイズを設定"""
+        self.font_size = size
+        self._update_style(self.hasFocus())
+
     def set_focused(self, focused: bool):
         """フォーカス状態を設定"""
         self._update_style(focused)
@@ -58,7 +68,7 @@ class FileListPanel(QFrame):
                 background-color: {bg};
                 color: {TEXT_DEFAULT};
                 border: none;
-                font-size: {FONT_SIZE};
+                font-size: {self.font_size}px;
             }}
             #fileListView::item {{
                 padding: 6px;

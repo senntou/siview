@@ -287,6 +287,12 @@ class MainWindow(QWidget):
             self.current_path = f"{self.current_path}/{name}"
 
         self._refresh_file_list()
+
+    def _file_list_change_font_size(self, delta: int):
+        """ファイルリストのフォントサイズを変更"""
+        current_size = self.file_list_panel.get_font_size()
+        new_size = max(6, min(48, current_size + delta))
+        self.file_list_panel.set_font_size(new_size)
     
     def _move_file_cursor(self, delta: int):
         """ファイルリストのカーソルを移動"""
@@ -409,6 +415,10 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_H,): self._go_parent,
                 (Qt.Key.Key_L,): self._enter_directory,
                 (Qt.Key.Key_O,): self._add_image_to_list,
+                ("Shift", Qt.Key.Key_Plus,): lambda: self._file_list_change_font_size(2),
+                (Qt.Key.Key_Semicolon,): lambda: self._file_list_change_font_size(2),
+                ("Shift", Qt.Key.Key_Equal,): lambda: self._file_list_change_font_size(-2),
+                (Qt.Key.Key_Minus,): lambda: self._file_list_change_font_size(-2),
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
