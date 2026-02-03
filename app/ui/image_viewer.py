@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QTextEdit, QVBoxLayout, QSizePolicy
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QTextEdit, QVBoxLayout, QSizePolicy
+from PySide6.QtGui import QGuiApplication, QPixmap, QImage
 from PySide6.QtCore import Qt
 
 from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT, FONT_SIZE, TEXT_DEFAULT
@@ -55,6 +55,9 @@ class ImageViewer(QFrame):
         self.text_view = QTextEdit(readOnly=True)
         self.text_view.setObjectName("textView")
 
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._open_context_menu)
+
         # レイアウト
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -86,6 +89,34 @@ class ImageViewer(QFrame):
             #imageViewer {{ border: 4px solid {border}; background-color: {bg}; }}
             #imageLabel {{ background-color: {bg}; }}
         """)
+
+    def _open_context_menu(self, pos):
+        if self._pixmap is None:
+            return
+
+        menu = QMenu(self)
+        menu.addAction("コピー", self._copy_image)
+        menu.addAction("保存", self._save_image)
+        menu.exec(self.mapToGlobal(pos))
+
+    def _copy_image(self):
+        if self._pixmap is None:
+            return
+        QGuiApplication.clipboard().setPixmap(self._pixmap)
+
+    def _save_image(self):
+        if self._pixmap is None:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "画像を保存",
+            "",
+            "PNG (*.png);;JPEG (*.jpg *.jpeg)"
+        )
+        if path:
+            self._pixmap.save(path)
+
 
     def clear_image(self):
         """画像をクリア"""
