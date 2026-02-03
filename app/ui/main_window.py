@@ -2,37 +2,44 @@ from PySide6.QtGui import QFont, QImage
 from PySide6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, QThread, Signal
 
-from sftp.client import SFTPClientWrapper
+from server.manager import ServerManager
+from api.client import HTTPClient
 from image.loader import ImageLoader
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
 
 
-class SFTPConnectWorker(QThread):
-    """SFTP接続を行うワーカースレッド"""
+class ServerConnectWorker(QThread):
+    """サーバーセットアップを行うワーカースレッド"""
     connected = Signal(str)  # 接続完了時に初期パスを送信
+    progress = Signal(str)   # 進捗メッセージ
     error = Signal(str)      # エラー発生時
 
     def __init__(self, host: str, parent=None):
         super().__init__(parent)
         self.host = host
-        self.client: SFTPClientWrapper | None = None
+        self.manager: ServerManager | None = None
+        self.client: HTTPClient | None = None
+        self._home_dir: str | None = None
 
     def run(self):
         try:
-            self.client = SFTPClientWrapper(self.host)
-            initial_path = self.client.pwd()
-            self.connected.emit(initial_path)
+            self.manager = ServerManager(self.host)
+            self._home_dir = self.manager.setup(
+                progress_callback=lambda msg: self.progress.emit(msg)
+            )
+            self.client = HTTPClient(home_dir=self._home_dir)
+            self.connected.emit(self._home_dir)
         except Exception as e:
             self.error.emit(str(e))
 
 
-class SFTPListWorker(QThread):
+class HTTPListWorker(QThread):
     """ファイル一覧を取得するワーカースレッド"""
     finished = Signal(str, list)  # (path, entries) entries: list of dict
     error = Signal(str)
 
-    def __init__(self, client: SFTPClientWrapper, path: str, parent=None):
+    def __init__(self, client: HTTPClient, path: str, parent=None):
         super().__init__(parent)
         self.client = client
         self.path = path
@@ -40,25 +47,21 @@ class SFTPListWorker(QThread):
     def run(self):
         try:
             entries = self.client.ls(self.path)
-            entries.sort()
 
-            result = []
-            for name in entries:
-                full_path = f"{self.path}/{name}"
-                is_dir = self.client.is_dir(full_path)
-                result.append({"name": name, "is_dir": is_dir})
+            # 名前でソート
+            entries.sort(key=lambda e: e["name"])
 
-            self.finished.emit(self.path, result)
+            self.finished.emit(self.path, entries)
         except Exception as e:
             self.error.emit(str(e))
 
 
-class SFTPFileWorker(QThread):
+class HTTPFileWorker(QThread):
     """ファイルを取得して画像として読み込むワーカースレッド"""
     finished = Signal(QImage, str)  # (image, filename)
     error = Signal(str)
 
-    def __init__(self, client: SFTPClientWrapper, remote_path: str, parent=None):
+    def __init__(self, client: HTTPClient, remote_path: str, parent=None):
         super().__init__(parent)
         self.client = client
         self.remote_path = remote_path
@@ -80,8 +83,9 @@ class MainWindow(QWidget):
         self.setWindowTitle("SIView")
         self.setGeometry(300, 100, 1200, 800)
 
-        # SFTP関連（非同期で初期化）
-        self.client: SFTPClientWrapper | None = None
+        # サーバー・HTTP関連（非同期で初期化）
+        self.manager: ServerManager | None = None
+        self.client: HTTPClient | None = None
         self.current_path: str | None = None
         self._loading = False
 
@@ -93,42 +97,49 @@ class MainWindow(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.file_list_panel)
         splitter.addWidget(self.image_viewer)
-        splitter.setSizes([1, 5])
+        splitter.setSizes([1, 6])
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(splitter)
 
         # ワーカー参照を保持（GC防止）
-        self._connect_worker: SFTPConnectWorker | None = None
-        self._list_worker: SFTPListWorker | None = None
-        self._file_worker: SFTPFileWorker | None = None
+        self._connect_worker: ServerConnectWorker | None = None
+        self._list_worker: HTTPListWorker | None = None
+        self._file_worker: HTTPFileWorker | None = None
 
         # キーシーケンス用（gg等の連続キー入力）
         self._pending_key: str | None = None
 
         # 初期状態：ローディング表示
-        self.file_list_panel.set_message("接続中...")
+        self.file_list_panel.set_message("サーバーをセットアップ中...")
 
-        # 非同期でSFTP接続を開始
+        # 非同期でサーバー接続を開始
         self._start_connect()
 
     def _start_connect(self):
-        """SFTP接続を非同期で開始"""
-        self._connect_worker = SFTPConnectWorker("kronecker", self)
+        """サーバーセットアップを非同期で開始"""
+        self._connect_worker = ServerConnectWorker("kronecker", self)
         self._connect_worker.connected.connect(self._on_connected)
+        self._connect_worker.progress.connect(self._on_progress)
         self._connect_worker.error.connect(self._on_connect_error)
         self._connect_worker.start()
 
+    def _on_progress(self, message: str):
+        """進捗メッセージを表示"""
+        self.file_list_panel.set_message(message)
+
     def _on_connected(self, initial_path: str):
-        """SFTP接続完了時のコールバック"""
+        """サーバー接続完了時のコールバック"""
         if self._connect_worker is None:
             raise RuntimeError("Connected but worker is None")
+        self.manager = self._connect_worker.manager
         self.client = self._connect_worker.client
         self.current_path = initial_path
         self._refresh_file_list()
 
     def _on_connect_error(self, error_msg: str):
-        """SFTP接続エラー時のコールバック"""
+        """サーバー接続エラー時のコールバック"""
         self.file_list_panel.set_message(f"接続エラー: {error_msg}")
 
     def _refresh_file_list(self):
@@ -142,7 +153,7 @@ class MainWindow(QWidget):
         if self.current_path is None:
             raise RuntimeError("Current path is None while refreshing file list")
 
-        self._list_worker = SFTPListWorker(self.client, self.current_path, self)
+        self._list_worker = HTTPListWorker(self.client, self.current_path, self)
         self._list_worker.finished.connect(self._on_list_finished)
         self._list_worker.error.connect(self._on_list_error)
         self._list_worker.start()
@@ -206,7 +217,7 @@ class MainWindow(QWidget):
             remote_path = f"{self.current_path}/{name}"
 
         # 非同期でファイルを取得
-        self._file_worker = SFTPFileWorker(self.client, remote_path, self)
+        self._file_worker = HTTPFileWorker(self.client, remote_path, self)
         self._file_worker.finished.connect(self._on_file_loaded)
         self._file_worker.error.connect(self._on_file_error)
         self._file_worker.start()
@@ -265,7 +276,7 @@ class MainWindow(QWidget):
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
-        """ウィンドウを閉じるときにSFTP接続をクローズ"""
-        if self.client is not None:
-            self.client.close()
+        """ウィンドウを閉じるときにサーバーをクリーンアップ"""
+        if self.manager is not None:
+            self.manager.cleanup()
         super().closeEvent(event)
