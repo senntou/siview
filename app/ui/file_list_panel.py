@@ -20,6 +20,30 @@ class FileListPanel(QListView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
+        self._update_border(False)
+
+    def set_focused(self, focused: bool):
+        """フォーカス状態を設定"""
+        self._update_border(focused)
+
+    def _update_border(self, focused: bool):
+        """枠線のスタイルを更新"""
+        border = "4px solid #4ec9b0" if focused else "4px solid transparent"
+        self.setStyleSheet(f"""
+            #fileListPanel {{
+                background-color: #1e1e1e;
+                color: #dddddd;
+                border: {border};
+                font-size: 18px;
+            }}
+            #fileListPanel::item {{
+                padding: 6px;
+            }}
+            #fileListPanel::item:selected {{
+                background-color: #007acc;
+                color: white;
+            }}
+        """)
 
     def set_entries(self, entries: list[dict]):
         """ファイルエントリを設定して表示を更新"""

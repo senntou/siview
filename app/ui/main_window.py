@@ -101,6 +101,10 @@ class MainWindow(QWidget):
         self.file_list_panel = FileListPanel()
         self.image_viewer = ImageViewer()
 
+        # フォーカスモード: "file_list" or "image_viewer"
+        self._focus_mode = "file_list"
+        self._update_focus_style()
+
         self._init_keymap()
 
         # Splitter
@@ -135,6 +139,23 @@ class MainWindow(QWidget):
         new_ratio = (ratio + delta * 0.01)
         new_ratio = max(0.1, min(0.9, new_ratio))  # 制限
         self.splitter.setSizes([int(new_ratio * total), int((1 - new_ratio) * total)])
+
+    def _focus_left(self):
+        """左のウィジェット(file_list)にフォーカス"""
+        if self._focus_mode != "file_list":
+            self._focus_mode = "file_list"
+            self._update_focus_style()
+
+    def _focus_right(self):
+        """右のウィジェット(image_viewer)にフォーカス"""
+        if self._focus_mode != "image_viewer":
+            self._focus_mode = "image_viewer"
+            self._update_focus_style()
+
+    def _update_focus_style(self):
+        """フォーカス状態に応じてスタイルを更新"""
+        self.file_list_panel.set_focused(self._focus_mode == "file_list")
+        self.image_viewer.set_focused(self._focus_mode == "image_viewer")
 
     def _start_connect(self):
         """サーバーセットアップを非同期で開始"""
@@ -260,32 +281,44 @@ class MainWindow(QWidget):
     def _init_keymap(self):
         self._pending_key = None
 
-        self._keymap = {
-            # Ctrl
-            ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
-            ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
-
-            # Normal
+        # グローバルキーマップ（全モード共通）
+        self._global_keymap = {
             (Qt.Key.Key_Q,): self.close,
-            (Qt.Key.Key_J,): lambda: self.file_list_panel.move_cursor_wrap(1),
-            (Qt.Key.Key_K,): lambda: self.file_list_panel.move_cursor_wrap(-1),
-            (Qt.Key.Key_H,): self._go_parent,
-            (Qt.Key.Key_L,): self._enter_directory,
-            (Qt.Key.Key_O,): self._open_file,
-
-            # Shift
-            ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
-            ("Shift", Qt.Key.Key_H): lambda: self._move_splitter(-3),
-            ("Shift", Qt.Key.Key_L): lambda: self._move_splitter(3),
+            ("Ctrl", Qt.Key.Key_H): lambda: self._move_splitter(-3),
+            ("Ctrl", Qt.Key.Key_L): lambda: self._move_splitter(3),
+            ("Shift", Qt.Key.Key_H): self._focus_left,
+            ("Shift", Qt.Key.Key_L): self._focus_right,
         }
 
-        self._sequences = {
-            (Qt.Key.Key_G, Qt.Key.Key_G): self.file_list_panel.go_top,  # gg
+        # モード別キーマップ
+        self._mode_keymaps = {
+            "file_list": {
+                (Qt.Key.Key_J,): lambda: self.file_list_panel.move_cursor_wrap(1),
+                (Qt.Key.Key_K,): lambda: self.file_list_panel.move_cursor_wrap(-1),
+                (Qt.Key.Key_H,): self._go_parent,
+                (Qt.Key.Key_L,): self._enter_directory,
+                (Qt.Key.Key_O,): self._open_file,
+                ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
+                ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
+                ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
+            },
+            "image_viewer": {
+                # 画像ビューア用キーは後で追加
+            },
+        }
+
+        # モード別シーケンス
+        self._mode_sequences = {
+            "file_list": {
+                (Qt.Key.Key_G, Qt.Key.Key_G): self.file_list_panel.go_top,
+            },
+            "image_viewer": {
+            },
         }
 
 
     def keyPressEvent(self, event):
-        """Vim風キーバインド（Ctrl / Shift / シーケンスを一般化）"""
+        """Vim風キーバインド（モード対応）"""
 
         # ---------- キー正規化 ----------
         parts = []
@@ -304,22 +337,31 @@ class MainWindow(QWidget):
             seq = (self._pending_key, event.key())
             self._pending_key = None
 
-            action = self._sequences.get(seq)
+            sequences = self._mode_sequences.get(self._focus_mode, {})
+            action = sequences.get(seq)
             if action:
                 action()
                 return
-            # 失敗したら通常処理へ落とす
 
-        # ---------- 通常キー処理 ----------
-        action = self._keymap.get(key_id)
+        # ---------- グローバルキー ----------
+        action = self._global_keymap.get(key_id)
         if action:
             action()
             return
 
-        # ---------- シーケンス開始 ----------
-        if key_id == (Qt.Key.Key_G,):
-            self._pending_key = Qt.Key.Key_G
+        # ---------- モード別キー ----------
+        mode_keymap = self._mode_keymaps.get(self._focus_mode, {})
+        action = mode_keymap.get(key_id)
+        if action:
+            action()
             return
+
+        # ---------- シーケンス開始（モード別） ----------
+        sequences = self._mode_sequences.get(self._focus_mode, {})
+        for seq in sequences:
+            if seq[0] == event.key():
+                self._pending_key = event.key()
+                return
 
         super().keyPressEvent(event)
 

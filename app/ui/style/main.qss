@@ -1,25 +1,4 @@
-/* ファイルリストパネル */
-#fileListPanel {
-    background-color: #1e1e1e;
-    color: #dddddd;
-    border: none;
-    font-size: 18px;
-}
-
-#fileListPanel::item {
-    padding: 6px;
-}
-
-#fileListPanel::item:selected {
-    background-color: #007acc;
-    color: white;
-}
-
-/* 画像ビューア */
-#imageViewer {
-    background-color: #1e1e1e;
-}
-
+/* 画像ビューア内部 */
 #imageLabel {
     background-color: #1e1e1e;
 }
