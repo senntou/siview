@@ -11,18 +11,23 @@ import os
 import select
 import threading
 import socketserver
+import sys
 from pathlib import Path
 from typing import Callable
 
 import paramiko
 
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path) # type: ignore
+    return os.path.join(os.path.abspath("."), relative_path)
 
 class ServerManager:
     """
     リモートサーバーのデプロイ・起動・トンネル管理
     """
 
-    LOCAL_BINARY = "siview-server-linux-amd64"
+    LOCAL_BINARY = resource_path("siview-server-linux-amd64")
     REMOTE_DIR = ".siview/bin"
     REMOTE_BINARY = "siview-server"
     REMOTE_PORT = 9000

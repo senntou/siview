@@ -21,7 +21,16 @@ class MainWindow(QWidget):
         self.host = host
         self.setWindowTitle(f"SIView - {host}")
         self.setGeometry(300, 100, 1200, 800)
-        self.setStyleSheet(load_stylesheet("style/main.qss"))
+        self.setStyleSheet("""
+            #imageLabel {
+                background-color: #1e1e1e;
+            }
+            #textView {
+                background-color: #252526;
+                color: #dddddd;
+                border: none;
+            }
+        """)
 
         # 状態管理
         self.state = StateManager(host)
