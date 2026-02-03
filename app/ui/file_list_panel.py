@@ -72,6 +72,9 @@ class FileListPanel(QFrame):
         """ファイルエントリを設定して表示を更新"""
         self._entries = entries
 
+        # ディレクトリ > ファイルの順にソート、名前順にソート
+        entries.sort(key=lambda e: (not e["is_dir"], e["name"].lower()))
+
         # 表示用の文字列リストを作成
         display_list = []
         for entry in entries:

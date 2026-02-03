@@ -99,6 +99,10 @@ class MainWindow(QWidget):
         self._home_dir: str | None = None
         self._loading = False
 
+        # 画像パスリスト
+        self._image_paths: list[str] = []
+        self._current_image_index: int = -1
+
         # UI コンポーネント
         self._current_display_path = ""  # 省略表示用にフルパスを保持
 
@@ -291,8 +295,8 @@ class MainWindow(QWidget):
 
         self._refresh_file_list()
 
-    def _open_file(self):
-        """選択中のファイルを開いて画像として表示"""
+    def _add_image_to_list(self):
+        """選択中のファイルを画像リストに追加"""
         if self._loading or self.client is None or self.current_path is None:
             return
 
@@ -307,7 +311,67 @@ class MainWindow(QWidget):
         else:
             remote_path = f"{self.current_path}/{name}"
 
-        # 非同期でファイルを取得
+        # 既にリストにある場合はその画像を表示
+        if remote_path in self._image_paths:
+            self._current_image_index = self._image_paths.index(remote_path)
+            self._show_current_image()
+            return
+
+        # リストに追加
+        self._image_paths.append(remote_path)
+        self._current_image_index = len(self._image_paths) - 1
+        self._show_current_image()
+
+    def _remove_current_image(self):
+        """現在表示中の画像をリストから削除"""
+        if not self._image_paths or self._current_image_index < 0:
+            return
+
+        self._image_paths.pop(self._current_image_index)
+
+        if not self._image_paths:
+            # リストが空になった
+            self._current_image_index = -1
+            self.image_viewer.clear_image()
+            self.image_viewer.set_pagination(0, 0)
+            return
+
+        # インデックスを調整
+        if self._current_image_index >= len(self._image_paths):
+            self._current_image_index = len(self._image_paths) - 1
+
+        self._show_current_image()
+
+    def _show_current_image(self):
+        """現在のインデックスの画像を表示"""
+        if not self._image_paths or self._current_image_index < 0:
+            return
+
+        remote_path = self._image_paths[self._current_image_index]
+        filename = remote_path.split("/")[-1]
+        self._load_image(remote_path)
+        self.image_viewer.set_filename(filename)
+        self.image_viewer.set_pagination(self._current_image_index, len(self._image_paths))
+
+    def _next_image(self):
+        """次の画像を表示"""
+        if not self._image_paths:
+            return
+        self._current_image_index = (self._current_image_index + 1) % len(self._image_paths)
+        self._show_current_image()
+
+    def _prev_image(self):
+        """前の画像を表示"""
+        if not self._image_paths:
+            return
+        self._current_image_index = (self._current_image_index - 1) % len(self._image_paths)
+        self._show_current_image()
+
+    def _load_image(self, remote_path: str):
+        """指定パスの画像を非同期で読み込み"""
+        if self.client is None:
+            return
+
         self._file_worker = HTTPFileWorker(self.client, remote_path, self)
         self._file_worker.finished.connect(self._on_file_loaded)
         self._file_worker.error.connect(self._on_file_error)
@@ -340,13 +404,15 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_K,): lambda: self.file_list_panel.move_cursor_wrap(-1),
                 (Qt.Key.Key_H,): self._go_parent,
                 (Qt.Key.Key_L,): self._enter_directory,
-                (Qt.Key.Key_O,): self._open_file,
+                (Qt.Key.Key_O,): self._add_image_to_list,
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
             },
             "image_viewer": {
-                # 画像ビューア用キーは後で追加
+                (Qt.Key.Key_J,): self._next_image,
+                (Qt.Key.Key_K,): self._prev_image,
+                (Qt.Key.Key_D,): self._remove_current_image,
             },
         }
 

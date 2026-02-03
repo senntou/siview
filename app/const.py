@@ -2,7 +2,7 @@
 
 # 背景色
 BG_DEFAULT = "#1e1e1e"
-BG_FOCUSED = "#2d2d2d"
+BG_FOCUSED = "#3d3d3d"
 
 # テキスト色
 TEXT_DEFAULT = "#dddddd"
