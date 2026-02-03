@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QFrame, QListView, QVBoxLayout
 from PySide6.QtCore import Qt
 
 from const import (
-    BG_DEFAULT, BG_FOCUSED, TEXT_DEFAULT, TEXT_SELECTED,
+    BG_DEFAULT, BG_FOCUSED, FONT_SIZE, TEXT_DEFAULT, TEXT_SELECTED,
     BORDER_FOCUSED, BORDER_DEFAULT, ITEM_SELECTED_BG
 )
 from ui.model.file_list_model import FileListModel
@@ -57,7 +57,7 @@ class FileListPanel(QFrame):
                 background-color: {bg};
                 color: {TEXT_DEFAULT};
                 border: none;
-                font-size: 18px;
+                font-size: {FONT_SIZE};
             }}
             #fileListView::item {{
                 padding: 6px;

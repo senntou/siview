@@ -1,6 +1,8 @@
-from PySide6.QtGui import QFont, QImage
-from PySide6.QtWidgets import QSplitter, QVBoxLayout, QWidget
+from PySide6.QtGui import QFont, QFontMetrics, QImage
+from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt, QThread, Signal
+
+from const import BG_DEFAULT, FONT_SIZE, TEXT_DEFAULT
 
 from server.manager import ServerManager
 from api.client import HTTPClient
@@ -98,6 +100,22 @@ class MainWindow(QWidget):
         self._loading = False
 
         # UI コンポーネント
+        self._current_display_path = ""  # 省略表示用にフルパスを保持
+
+        self.path_label = QLabel()
+        self.path_label.setObjectName("pathLabel")
+        self.path_label.setStyleSheet(f"""
+            #pathLabel {{
+                background-color: #cce;
+                color: black;
+                padding: 4px 8px;
+                font-size: {FONT_SIZE};
+            }}
+        """)
+        # 高さを1行分に固定、横は親に合わせる
+        self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.path_label.setFixedHeight(28)
+
         self.file_list_panel = FileListPanel()
         self.image_viewer = ImageViewer()
 
@@ -118,6 +136,8 @@ class MainWindow(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.path_label)
         layout.addWidget(self.splitter)
 
         # ワーカー参照を保持（GC防止）
@@ -211,9 +231,29 @@ class MainWindow(QWidget):
         self._loading = False
         self.file_list_panel.set_entries(entries)
         self.setWindowTitle(f"SIView - {self.host}:{path}")
+        self._set_path_label(path)
 
         # カレントディレクトリを保存
         self.state.set_current_dir(path)
+
+    def _set_path_label(self, path: str):
+        """パスラベルを設定（長すぎる場合は省略）"""
+        self._current_display_path = path
+        self._update_path_label()
+
+    def _update_path_label(self):
+        """パスラベルの表示を更新（ウィンドウ幅に合わせて省略）"""
+        if not self._current_display_path:
+            return
+
+        font_metrics = QFontMetrics(self.path_label.font())
+        available_width = self.path_label.width() - 24  # padding分を引く
+        elided = font_metrics.elidedText(
+            self._current_display_path,
+            Qt.TextElideMode.ElideLeft,  # 左側を省略（末尾のディレクトリ名を優先）
+            available_width
+        )
+        self.path_label.setText(elided)
 
     def _on_list_error(self, error_msg: str):
         """ファイル一覧取得エラー時のコールバック"""
@@ -368,6 +408,10 @@ class MainWindow(QWidget):
 
         super().keyPressEvent(event)
 
+    def resizeEvent(self, event):
+        """ウィンドウリサイズ時にパスラベルを更新"""
+        super().resizeEvent(event)
+        self._update_path_label()
 
     def closeEvent(self, event):
         """ウィンドウを閉じるときにサーバーをクリーンアップ"""
