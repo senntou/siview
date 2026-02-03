@@ -14,7 +14,12 @@ class StateManager:
     STATE_DIR = Path.home() / ".siview"
     STATE_FILE = STATE_DIR / "state.json"
 
-    def __init__(self, host: str):
+    # グローバル状態用のキー
+    _GLOBAL_KEY = "_global"
+    _LAST_HOST_KEY = "last_host"
+    _HOST_HISTORY_KEY = "host_history"
+
+    def __init__(self, host: str | None = None):
         self.host = host
         self._state = self._load()
 
@@ -43,8 +48,47 @@ class StateManager:
 
     def set_current_dir(self, path: str):
         """カレントディレクトリを保存"""
+        if self.host is None:
+            return
+
         if self.host not in self._state:
             self._state[self.host] = {}
 
         self._state[self.host]["current_dir"] = path
         self._save()
+
+    # --- グローバル状態（ホスト非依存） ---
+
+    def get_last_host(self) -> str | None:
+        """最後に使用したホスト名を取得"""
+        global_state = self._state.get(self._GLOBAL_KEY, {})
+        return global_state.get(self._LAST_HOST_KEY)
+
+    def set_last_host(self, host: str):
+        """最後に使用したホスト名を保存"""
+        if self._GLOBAL_KEY not in self._state:
+            self._state[self._GLOBAL_KEY] = {}
+
+        self._state[self._GLOBAL_KEY][self._LAST_HOST_KEY] = host
+        self._add_to_history(host)
+        self._save()
+
+    def get_host_history(self) -> list[str]:
+        """ホスト名の履歴を取得（最新順）"""
+        global_state = self._state.get(self._GLOBAL_KEY, {})
+        return global_state.get(self._HOST_HISTORY_KEY, [])
+
+    def _add_to_history(self, host: str):
+        """ホスト名を履歴に追加（最新を先頭に、重複は削除）"""
+        if self._GLOBAL_KEY not in self._state:
+            self._state[self._GLOBAL_KEY] = {}
+
+        history = self._state[self._GLOBAL_KEY].get(self._HOST_HISTORY_KEY, [])
+
+        # 既存のものを削除して先頭に追加
+        if host in history:
+            history.remove(host)
+        history.insert(0, host)
+
+        # 最大10件まで保持
+        self._state[self._GLOBAL_KEY][self._HOST_HISTORY_KEY] = history[:10]

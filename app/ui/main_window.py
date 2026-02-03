@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidg
 from PySide6.QtCore import Qt
 
 from ui.thread.workers import HTTPFileWorker, HTTPListWorker, ServerConnectWorker
+from ui.host_dialog import HostDialog
 from const import FONT_SIZE
 
 from server.manager import ServerManager
@@ -140,6 +141,9 @@ class MainWindow(QWidget):
         self.client = self._connect_worker.client
         self._home_dir = home_dir
 
+        # 接続成功したホスト名を保存
+        self.state.set_last_host(self.host)
+
         # 保存されたパスがあればそれを使用、なければホームディレクトリ
         saved_path = self.state.get_current_dir()
         self.current_path = saved_path if saved_path else home_dir
@@ -149,6 +153,49 @@ class MainWindow(QWidget):
     def _on_connect_error(self, error_msg: str):
         """サーバー接続エラー時のコールバック"""
         self.file_list_panel.set_message(f"接続エラー: {error_msg}")
+
+    def _show_host_dialog(self):
+        """ホスト選択ダイアログを表示"""
+        # グローバル状態から履歴を取得
+        global_state = StateManager()
+        history = global_state.get_host_history()
+
+        dialog = HostDialog(history, self.host, self)
+        if dialog.exec() != HostDialog.DialogCode.Accepted:
+            return
+
+        new_host = dialog.selected_host()
+        if not new_host or new_host == self.host:
+            return
+
+        # ホストを変更して再接続
+        self._change_host(new_host)
+
+    def _change_host(self, new_host: str):
+        """ホストを変更して再接続"""
+        # 現在の接続をクリーンアップ
+        if self.manager is not None:
+            self.manager.cleanup()
+            self.manager = None
+
+        self.client = None
+        self._home_dir = None
+        self.current_path = None
+
+        # 画像リストをクリア
+        self._image_paths.clear()
+        self._current_image_index = -1
+        self.image_viewer.clear_image()
+        self.image_viewer.set_pagination(0, 0)
+
+        # 新しいホストに切り替え
+        self.host = new_host
+        self.state = StateManager(new_host)
+        self.setWindowTitle(f"SIView - {new_host}")
+
+        # 再接続
+        self.file_list_panel.set_message("サーバーをセットアップ中...")
+        self._start_connect()
 
     def _refresh_file_list(self):
         """現在のディレクトリのファイル一覧を非同期で更新"""
@@ -342,6 +389,7 @@ class MainWindow(QWidget):
             ("Ctrl", Qt.Key.Key_L): lambda: self._move_splitter(3),
             ("Shift", Qt.Key.Key_H): self._focus_left,
             ("Shift", Qt.Key.Key_L): self._focus_right,
+            ("Shift", Qt.Key.Key_R): self._show_host_dialog,
         }
 
         # モード別キーマップ
