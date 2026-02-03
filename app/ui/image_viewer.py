@@ -2,6 +2,8 @@ from PySide6.QtWidgets import QFrame, QLabel, QTextEdit, QVBoxLayout, QSizePolic
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtCore import Qt
 
+from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT
+
 
 class ImageViewer(QFrame):
     """画像とテキストを表示するビューア"""
@@ -15,7 +17,7 @@ class ImageViewer(QFrame):
         # 枠線設定
         self.setFrameShape(QFrame.Shape.Box)
         self.setLineWidth(4)
-        self._update_border(False)
+        self.set_focused(False)
 
         # 画像表示
         self.image_label = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
@@ -49,14 +51,12 @@ class ImageViewer(QFrame):
 
     def set_focused(self, focused: bool):
         """フォーカス状態を設定"""
-        self._update_border(focused)
-
-    def _update_border(self, focused: bool):
-        """枠線のスタイルを更新"""
-        if focused:
-            self.setStyleSheet("#imageViewer { border: 4px solid #4ec9b0; }")
-        else:
-            self.setStyleSheet("#imageViewer { border: 4px solid transparent; }")
+        bg = BG_FOCUSED if focused else BG_DEFAULT
+        border = BORDER_FOCUSED if focused else BORDER_DEFAULT
+        self.setStyleSheet(f"""
+            #imageViewer {{ border: 4px solid {border}; background-color: {bg}; }}
+            #imageLabel {{ background-color: {bg}; }}
+        """)
 
     def clear_image(self):
         """画像をクリア"""

@@ -1,49 +1,70 @@
-from PySide6.QtWidgets import QListView
+from PySide6.QtWidgets import QFrame, QListView, QVBoxLayout
 from PySide6.QtCore import Qt
 
+from const import (
+    BG_DEFAULT, BG_FOCUSED, TEXT_DEFAULT, TEXT_SELECTED,
+    BORDER_FOCUSED, BORDER_DEFAULT, ITEM_SELECTED_BG
+)
 from ui.model.file_list_model import FileListModel
 
 
-class FileListPanel(QListView):
+class FileListPanel(QFrame):
     """ファイル一覧を表示するパネル"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.setObjectName("fileListPanel")
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # キーイベントを親で処理
+
+        # 枠線設定
+        self.setFrameShape(QFrame.Shape.Box)
+        self.setLineWidth(4)
+
+        # リストビュー
+        self._list_view = QListView()
+        self._list_view.setObjectName("fileListView")
+        self._list_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self._model = FileListModel()
-        self.setModel(self._model)
-        self.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
+        self._list_view.setModel(self._model)
+        self._list_view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
 
         # スクロールバーを非表示
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._list_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # レイアウト
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._list_view)
 
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
-        self._update_border(False)
+
+        self._update_style(False)
 
     def set_focused(self, focused: bool):
         """フォーカス状態を設定"""
-        self._update_border(focused)
+        self._update_style(focused)
 
-    def _update_border(self, focused: bool):
-        """枠線のスタイルを更新"""
-        border = "4px solid #4ec9b0" if focused else "4px solid transparent"
-        self.setStyleSheet(f"""
-            #fileListPanel {{
-                background-color: #1e1e1e;
-                color: #dddddd;
-                border: {border};
+    def _update_style(self, focused: bool):
+        """スタイルを更新"""
+        bg = BG_FOCUSED if focused else BG_DEFAULT
+        border = BORDER_FOCUSED if focused else BORDER_DEFAULT
+
+        self.setStyleSheet(f"#fileListPanel {{ border: 4px solid {border}; background-color: {bg}; }}")
+        self._list_view.setStyleSheet(f"""
+            #fileListView {{
+                background-color: {bg};
+                color: {TEXT_DEFAULT};
+                border: none;
                 font-size: 18px;
             }}
-            #fileListPanel::item {{
+            #fileListView::item {{
                 padding: 6px;
             }}
-            #fileListPanel::item:selected {{
-                background-color: #007acc;
-                color: white;
+            #fileListView::item:selected {{
+                background-color: {ITEM_SELECTED_BG};
+                color: {TEXT_SELECTED};
             }}
         """)
 
@@ -63,7 +84,7 @@ class FileListPanel(QListView):
 
         # 最初のアイテムを選択
         if len(display_list) > 0:
-            self.setCurrentIndex(self._model.index(0, 0))
+            self._list_view.setCurrentIndex(self._model.index(0, 0))
 
     def set_message(self, message: str):
         """単一メッセージを表示（ローディング、エラー等）"""
@@ -72,13 +93,13 @@ class FileListPanel(QListView):
 
     def current_row(self) -> int:
         """現在選択中の行番号を取得"""
-        index = self.currentIndex()
+        index = self._list_view.currentIndex()
         return index.row() if index.isValid() else -1
 
     def set_current_row(self, row: int):
         """指定した行を選択"""
         row = min(max(row, 0), self._model.rowCount() - 1)
-        self.setCurrentIndex(self._model.index(row, 0))
+        self._list_view.setCurrentIndex(self._model.index(row, 0))
 
     def move_cursor(self, delta: int):
         """カーソルを上下に移動"""
