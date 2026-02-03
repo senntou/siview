@@ -1,9 +1,10 @@
 from PySide6.QtWidgets import QFrame, QListView, QVBoxLayout
+from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 from natsort import natsort_keygen
 
 from const import (
-    BG_DEFAULT, BG_FOCUSED, FONT_SIZE, TEXT_DEFAULT, TEXT_SELECTED,
+    BG_DEFAULT, BG_FOCUSED, TEXT_DEFAULT, TEXT_SELECTED,
     BORDER_FOCUSED, BORDER_DEFAULT, ITEM_SELECTED_BG
 )
 from ui.model.file_list_model import FileListModel
@@ -16,6 +17,7 @@ class FileListPanel(QFrame):
         super().__init__(parent)
 
         self.font_size = 18
+        self._is_focused = False
         self.setObjectName("fileListPanel")
 
         # 枠線設定
@@ -43,6 +45,10 @@ class FileListPanel(QFrame):
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
 
         self._update_style(False)
+        # 初期フォントサイズを設定（Windowsではスタイルシートが効かないため）
+        font = self._list_view.font()
+        font.setPixelSize(self.font_size)
+        self._list_view.setFont(font)
 
     def get_font_size(self) -> int:
         """フォントサイズを取得"""
@@ -51,10 +57,15 @@ class FileListPanel(QFrame):
     def set_font_size(self, size: int):
         """フォントサイズを設定"""
         self.font_size = size
-        self._update_style(self.hasFocus())
+        # Windowsではスタイルシートのfont-sizeが効かないため、QFontを直接設定
+        font = self._list_view.font()
+        font.setPixelSize(size)
+        self._list_view.setFont(font)
+        self._update_style(self._is_focused)
 
     def set_focused(self, focused: bool):
         """フォーカス状態を設定"""
+        self._is_focused = focused
         self._update_style(focused)
 
     def _update_style(self, focused: bool):
@@ -68,7 +79,6 @@ class FileListPanel(QFrame):
                 background-color: {bg};
                 color: {TEXT_DEFAULT};
                 border: none;
-                font-size: {self.font_size}px;
             }}
             #fileListView::item {{
                 padding: 6px;

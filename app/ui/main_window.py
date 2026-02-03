@@ -1,4 +1,4 @@
-from PySide6.QtGui import QFontMetrics, QImage
+from PySide6.QtGui import QFont, QFontMetrics, QImage
 from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 
@@ -41,6 +41,7 @@ class MainWindow(QWidget):
         self.current_path: str | None = None
         self._home_dir: str | None = None
         self._loading = False
+        self._font_size = FONT_SIZE
 
         # 画像パスリスト
         self._image_paths: list[str] = []
@@ -54,17 +55,16 @@ class MainWindow(QWidget):
 
         self.path_label = QLabel()
         self.path_label.setObjectName("pathLabel")
-        self.path_label.setStyleSheet(f"""
-            #pathLabel {{
+        self.path_label.setStyleSheet("""
+            #pathLabel {
                 background-color: #cce;
                 color: black;
                 padding: 4px 8px;
-                font-size: {FONT_SIZE};
-            }}
+            }
         """)
         # 高さを1行分に固定、横は親に合わせる
         self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.path_label.setFixedHeight(28)
+        self._update_path_label_font(FONT_SIZE)
 
         self.file_list_panel = FileListPanel()
         self.image_viewer = ImageViewer()
@@ -288,11 +288,21 @@ class MainWindow(QWidget):
 
         self._refresh_file_list()
 
-    def _file_list_change_font_size(self, delta: int):
-        """ファイルリストのフォントサイズを変更"""
-        current_size = self.file_list_panel.get_font_size()
-        new_size = max(6, min(48, current_size + delta))
-        self.file_list_panel.set_font_size(new_size)
+    def _change_font_size(self, delta: int):
+        """全体のフォントサイズを変更"""
+        self._font_size = max(6, min(48, self._font_size + delta))
+        self.file_list_panel.set_font_size(self._font_size)
+        self.image_viewer.set_font_size(self._font_size)
+        self._update_path_label_font(self._font_size)
+
+    def _update_path_label_font(self, size: int):
+        """path_label のフォントと高さを更新"""
+        font = self.path_label.font()
+        font.setPixelSize(size)
+        self.path_label.setFont(font)
+        # フォントサイズに合わせて高さを調整（パディング含む）
+        metrics = QFontMetrics(font)
+        self.path_label.setFixedHeight(metrics.height() + 12)
     
     def _move_file_cursor(self, delta: int):
         """ファイルリストのカーソルを移動"""
@@ -405,6 +415,10 @@ class MainWindow(QWidget):
             ("Shift", Qt.Key.Key_H): self._focus_left,
             ("Shift", Qt.Key.Key_L): self._focus_right,
             ("Shift", Qt.Key.Key_R): self._show_host_dialog,
+            ("Shift", Qt.Key.Key_Plus,): lambda: self._change_font_size(2),
+            (Qt.Key.Key_Semicolon,): lambda: self._change_font_size(2),
+            ("Shift", Qt.Key.Key_Equal,): lambda: self._change_font_size(-2),
+            (Qt.Key.Key_Minus,): lambda: self._change_font_size(-2),
         }
 
         # モード別キーマップ
@@ -415,10 +429,6 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_H,): self._go_parent,
                 (Qt.Key.Key_L,): self._enter_directory,
                 (Qt.Key.Key_O,): self._add_image_to_list,
-                ("Shift", Qt.Key.Key_Plus,): lambda: self._file_list_change_font_size(2),
-                (Qt.Key.Key_Semicolon,): lambda: self._file_list_change_font_size(2),
-                ("Shift", Qt.Key.Key_Equal,): lambda: self._file_list_change_font_size(-2),
-                (Qt.Key.Key_Minus,): lambda: self._file_list_change_font_size(-2),
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,

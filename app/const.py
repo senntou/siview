@@ -15,4 +15,4 @@ BORDER_DEFAULT = "transparent"
 # 選択アイテム
 ITEM_SELECTED_BG = "#007acc"
 
-FONT_SIZE = "18px"
+FONT_SIZE = 18

@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QTextEdit, QVBoxLayout, QSizePolicy
-from PySide6.QtGui import QGuiApplication, QPixmap, QImage
+from PySide6.QtGui import QFont, QFontMetrics, QGuiApplication, QPixmap, QImage
 from PySide6.QtCore import Qt, QTimer
 
 from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT, FONT_SIZE, TEXT_DEFAULT
@@ -27,11 +27,10 @@ class ImageViewer(QFrame):
         self.pagination_label.setStyleSheet(f"""
             #paginationLabel {{
                 color: {TEXT_DEFAULT};
-                font-size: {FONT_SIZE};
                 padding: 4px;
             }}
         """)
-        self.pagination_label.setFixedHeight(24)
+        self._set_label_font(self.pagination_label, FONT_SIZE)
 
         # 画像表示
         self.image_label = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
@@ -46,11 +45,10 @@ class ImageViewer(QFrame):
         self.filename_label.setStyleSheet(f"""
             #filenameLabel {{
                 color: {TEXT_DEFAULT};
-                font-size: {FONT_SIZE};
                 padding: 4px;
             }}
         """)
-        self.filename_label.setFixedHeight(30)
+        self._set_label_font(self.filename_label, FONT_SIZE)
 
         # テキスト表示
         self.text_view = QTextEdit(readOnly=True)
@@ -180,3 +178,17 @@ class ImageViewer(QFrame):
             Qt.TransformationMode.SmoothTransformation
         )
         self.image_label.setPixmap(scaled)
+
+    def _set_label_font(self, label: QLabel, size: int):
+        """ラベルにフォントサイズと高さを設定（Windows対応）"""
+        font = label.font()
+        font.setPixelSize(size)
+        label.setFont(font)
+        # フォントサイズに合わせて高さを調整（パディング含む）
+        metrics = QFontMetrics(font)
+        label.setFixedHeight(metrics.height() + 10)
+
+    def set_font_size(self, size: int):
+        """全ラベルのフォントサイズを設定"""
+        self._set_label_font(self.pagination_label, size)
+        self._set_label_font(self.filename_label, size)
