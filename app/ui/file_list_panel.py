@@ -1,5 +1,7 @@
 from PySide6.QtWidgets import QListView
-from PySide6.QtCore import QStringListModel, Qt
+from PySide6.QtCore import Qt
+
+from ui.model.file_list_model import FileListModel
 
 
 class FileListPanel(QListView):
@@ -11,7 +13,7 @@ class FileListPanel(QListView):
         self.setObjectName("fileListPanel")
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # キーイベントを親で処理
 
-        self._model = QStringListModel()
+        self._model = FileListModel()
         self.setModel(self._model)
         self.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
 
@@ -57,7 +59,7 @@ class FileListPanel(QListView):
             display_name = f"{name}/" if is_dir else name
             display_list.append(display_name)
 
-        self._model.setStringList(display_list)
+        self._model.set_entries(entries)
 
         # 最初のアイテムを選択
         if len(display_list) > 0:
@@ -66,7 +68,7 @@ class FileListPanel(QListView):
     def set_message(self, message: str):
         """単一メッセージを表示（ローディング、エラー等）"""
         self._entries = []
-        self._model.setStringList([message])
+        self._model.set_entries([{"name": message, "is_dir": False}])
 
     def current_row(self) -> int:
         """現在選択中の行番号を取得"""

@@ -111,7 +111,10 @@ class MainWindow(QWidget):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.file_list_panel)
         self.splitter.addWidget(self.image_viewer)
-        self.splitter.setSizes([200, 1000])
+
+        ratio = 0.3
+        size = self.width()
+        self.splitter.setSizes([int(size * ratio), int(size * (1 - ratio))])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
