@@ -2,3 +2,6 @@ __pycache__
 siview-server-linux-amd64
 .siview-server.hash
 .env
+
+build
+dist
