@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QTextEdit, QVBoxLayout, QSizePolicy
 from PySide6.QtGui import QGuiApplication, QPixmap, QImage
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT, FONT_SIZE, TEXT_DEFAULT
 
@@ -13,6 +13,7 @@ class ImageViewer(QFrame):
 
         self.setObjectName("imageViewer")
         self._pixmap: QPixmap | None = None
+        self._is_focused: bool = False
 
         # 枠線設定
         self.setFrameShape(QFrame.Shape.Box)
@@ -49,7 +50,7 @@ class ImageViewer(QFrame):
                 padding: 4px;
             }}
         """)
-        self.filename_label.setFixedHeight(24)
+        self.filename_label.setFixedHeight(30)
 
         # テキスト表示
         self.text_view = QTextEdit(readOnly=True)
@@ -83,6 +84,7 @@ class ImageViewer(QFrame):
 
     def set_focused(self, focused: bool):
         """フォーカス状態を設定"""
+        self._is_focused = focused
         bg = BG_FOCUSED if focused else BG_DEFAULT
         border = BORDER_FOCUSED if focused else BORDER_DEFAULT
         self.setStyleSheet(f"""
@@ -103,6 +105,26 @@ class ImageViewer(QFrame):
         if self._pixmap is None:
             return
         QGuiApplication.clipboard().setPixmap(self._pixmap)
+        self._show_copy_feedback()
+
+    def _show_copy_feedback(self):
+        """コピー完了のフィードバックを表示"""
+        # 枠をフラッシュ
+        self._flash_border()
+        # テキストを一時的に表示
+        original_text = self.text_view.toPlainText()
+        self.text_view.setPlainText("クリップボードにコピーしました")
+        QTimer.singleShot(1500, lambda: self.text_view.setPlainText(original_text))
+
+    def _flash_border(self):
+        """枠を一時的にハイライト"""
+        flash_color = "#FFFF00"  # 黄色でフラッシュ
+        bg = BG_FOCUSED if self._is_focused else BG_DEFAULT
+        self.setStyleSheet(f"""
+            #imageViewer {{ border: 4px solid {flash_color}; background-color: {bg}; }}
+            #imageLabel {{ background-color: {bg}; }}
+        """)
+        QTimer.singleShot(300, lambda: self.set_focused(self._is_focused))
 
     def _save_image(self):
         if self._pixmap is None:

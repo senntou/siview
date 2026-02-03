@@ -427,6 +427,7 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_J,): self._next_image,
                 (Qt.Key.Key_K,): self._prev_image,
                 (Qt.Key.Key_D,): self._remove_current_image,
+                (Qt.Key.Key_Y,): self.image_viewer._copy_image,
             },
         }
 
