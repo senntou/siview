@@ -4,7 +4,7 @@ SFTPClientWrapper互換のHTTPクライアント
 ローカルポート9000経由でリモートのsiview-serverと通信
 """
 
-import os
+import posixpath
 import urllib.parse
 import urllib.request
 import json
@@ -38,8 +38,8 @@ class HTTPClient:
         else:
             abs_path = path
 
-        # パスを正規化
-        abs_path = os.path.normpath(abs_path)
+        # パスを正規化（リモートは常にPOSIXパス）
+        abs_path = posixpath.normpath(abs_path)
 
         # ホームディレクトリからの相対パスに変換
         rel_path = self._to_relative_path(abs_path)
@@ -64,7 +64,7 @@ class HTTPClient:
         with urllib.request.urlopen(url) as response:
             data = response.read()
 
-        filename = os.path.basename(remote_path)
+        filename = posixpath.basename(remote_path)
         return data, filename
 
     def pwd(self) -> str:
@@ -76,13 +76,13 @@ class HTTPClient:
         if path.startswith("/"):
             self._cwd = path
         else:
-            self._cwd = os.path.normpath(f"{self._cwd}/{path}")
+            self._cwd = posixpath.normpath(f"{self._cwd}/{path}")
 
     def is_dir(self, path: str) -> bool:
         """パスがディレクトリかどうかを判定"""
         # 親ディレクトリの一覧を取得して判定
-        parent = os.path.dirname(path)
-        name = os.path.basename(path)
+        parent = posixpath.dirname(path)
+        name = posixpath.basename(path)
 
         try:
             entries = self.ls(parent)
@@ -104,8 +104,8 @@ class HTTPClient:
 
         例: /home/user/foo → foo (home_dir が /home/user の場合)
         """
-        # パスを正規化
-        abs_path = os.path.normpath(abs_path)
+        # パスを正規化（リモートは常にPOSIXパス）
+        abs_path = posixpath.normpath(abs_path)
 
         # ホームディレクトリからの相対パス
         if abs_path.startswith(self._home_dir):
