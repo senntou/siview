@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from server.manager import ServerManager
 from api.client import HTTPClient
 from image.loader import ImageLoader
+from state.manager import StateManager
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
 from util.loader import load_stylesheet
@@ -78,17 +79,22 @@ class HTTPFileWorker(QThread):
 
 
 class MainWindow(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, host: str, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle("SIView")
+        self.host = host
+        self.setWindowTitle(f"SIView - {host}")
         self.setGeometry(300, 100, 1200, 800)
         self.setStyleSheet(load_stylesheet("style/main.qss"))
+
+        # 状態管理
+        self.state = StateManager(host)
 
         # サーバー・HTTP関連（非同期で初期化）
         self.manager: ServerManager | None = None
         self.client: HTTPClient | None = None
         self.current_path: str | None = None
+        self._home_dir: str | None = None
         self._loading = False
 
         # UI コンポーネント
@@ -99,7 +105,7 @@ class MainWindow(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.file_list_panel)
         splitter.addWidget(self.image_viewer)
-        splitter.setSizes([1, 6])
+        splitter.setSizes([200, 1000])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -121,7 +127,7 @@ class MainWindow(QWidget):
 
     def _start_connect(self):
         """サーバーセットアップを非同期で開始"""
-        self._connect_worker = ServerConnectWorker("kronecker", self)
+        self._connect_worker = ServerConnectWorker(self.host, self)
         self._connect_worker.connected.connect(self._on_connected)
         self._connect_worker.progress.connect(self._on_progress)
         self._connect_worker.error.connect(self._on_connect_error)
@@ -131,13 +137,18 @@ class MainWindow(QWidget):
         """進捗メッセージを表示"""
         self.file_list_panel.set_message(message)
 
-    def _on_connected(self, initial_path: str):
+    def _on_connected(self, home_dir: str):
         """サーバー接続完了時のコールバック"""
         if self._connect_worker is None:
             raise RuntimeError("Connected but worker is None")
         self.manager = self._connect_worker.manager
         self.client = self._connect_worker.client
-        self.current_path = initial_path
+        self._home_dir = home_dir
+
+        # 保存されたパスがあればそれを使用、なければホームディレクトリ
+        saved_path = self.state.get_current_dir()
+        self.current_path = saved_path if saved_path else home_dir
+
         self._refresh_file_list()
 
     def _on_connect_error(self, error_msg: str):
@@ -164,7 +175,10 @@ class MainWindow(QWidget):
         """ファイル一覧取得完了時のコールバック"""
         self._loading = False
         self.file_list_panel.set_entries(entries)
-        self.setWindowTitle(f"SIView - {path}")
+        self.setWindowTitle(f"SIView - {self.host}:{path}")
+
+        # カレントディレクトリを保存
+        self.state.set_current_dir(path)
 
     def _on_list_error(self, error_msg: str):
         """ファイル一覧取得エラー時のコールバック"""

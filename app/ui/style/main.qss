@@ -3,6 +3,7 @@
     background-color: #1e1e1e;
     color: #dddddd;
     border: none;
+    font-size: 18px;
 }
 
 #fileListPanel::item {

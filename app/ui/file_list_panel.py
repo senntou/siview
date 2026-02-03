@@ -13,6 +13,7 @@ class FileListPanel(QListView):
 
         self._model = QStringListModel()
         self.setModel(self._model)
+        self.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
 
         self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
 
