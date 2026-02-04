@@ -1,3 +1,5 @@
+import posixpath
+
 from PySide6.QtGui import QFont, QFontMetrics, QIcon, QImage
 from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
@@ -476,8 +478,34 @@ class MainWindow(QWidget):
 
 
     def _on_command_accepted(self, command: str):
-        """コマンド受理時のスロット（暫定: コンソール出力のみ）"""
-        print(f"command: {command}")
+        """コマンド受理時のスロット"""
+        parts = command.split(None, 1)
+        cmd = parts[0] if parts else ""
+
+        if cmd == "cd":
+            self._exec_cd(parts[1] if len(parts) > 1 else "")
+        else:
+            self.image_viewer.set_text(f"unknown command: {command}")
+
+    def _exec_cd(self, path: str):
+        """cdコマンド: 指定パスへ移動"""
+        if self.client is None or self.current_path is None:
+            self.image_viewer.set_text("サーバー未接続")
+            return
+
+        if not path or path == "~":
+            # 引数なし or ~ → ホームディレクトリ
+            target = self._home_dir or "/"
+        elif path.startswith("~/"):
+            target = posixpath.join(self._home_dir or "/", path[2:])
+        elif path.startswith("/"):
+            target = path
+        else:
+            target = posixpath.join(self.current_path, path)
+
+        target = posixpath.normpath(target)
+        self.current_path = target
+        self._refresh_file_list()
 
     def keyPressEvent(self, event):
         """Vim風キーバインド（モード対応）"""
