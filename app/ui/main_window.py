@@ -12,6 +12,7 @@ from api.client import HTTPClient
 from state.manager import StateManager
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
+from ui.command_overlay import CommandOverlay
 from util.loader import resource_path
 
 
@@ -104,6 +105,10 @@ class MainWindow(QWidget):
 
         # 初期状態：ローディング表示
         self.file_list_panel.set_message("サーバーをセットアップ中...")
+
+        # コマンドオーバーレイ（初期非表示）
+        self.command_overlay = CommandOverlay(self)
+        self.command_overlay.command_accepted.connect(self._on_command_accepted)
 
         # 非同期でサーバー接続を開始
         self._start_connect()
@@ -470,8 +475,17 @@ class MainWindow(QWidget):
         }
 
 
+    def _on_command_accepted(self, command: str):
+        """コマンド受理時のスロット（暫定: コンソール出力のみ）"""
+        print(f"command: {command}")
+
     def keyPressEvent(self, event):
         """Vim風キーバインド（モード対応）"""
+
+        # ---------- コマンドモード起動 ----------
+        if event.text() == ":":
+            self.command_overlay.activate()
+            return
 
         # ---------- キー正規化 ----------
         parts = []
@@ -519,9 +533,11 @@ class MainWindow(QWidget):
         super().keyPressEvent(event)
 
     def resizeEvent(self, event):
-        """ウィンドウリサイズ時にパスラベルを更新"""
+        """ウィンドウリサイズ時にパスラベルとオーバーレイ位置を更新"""
         super().resizeEvent(event)
         self._update_path_label()
+        if self.command_overlay.isVisible():
+            self.command_overlay._reposition()
 
     def closeEvent(self, event):
         """ウィンドウを閉じるときにサーバーをクリーンアップ"""
