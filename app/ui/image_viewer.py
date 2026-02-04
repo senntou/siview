@@ -218,6 +218,42 @@ class ImageViewer(QFrame):
 
         return super().eventFilter(obj, event)
 
+    def zoom_to_fit_width(self):
+        """画像の横幅をウィジェットの横幅に合わせるようにズーム率を設定する"""
+        if self._pixmap is None:
+            return
+
+        label_size = self.image_label.size()
+        fitted = self._pixmap.size().scaled(
+            label_size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+        )
+        if fitted.width() <= 0:
+            return
+
+        self._zoom_factor = label_size.width() / fitted.width()
+        self._zoom_factor = max(self._ZOOM_MIN, min(self._ZOOM_MAX, self._zoom_factor))
+        self._pan_offset = QPointF(0, 0)
+        self._update_image()
+
+    def zoom_to_fit_height(self):
+        """画像の高さをウィジェットの高さに合わせるようにズーム率を設定する"""
+        if self._pixmap is None:
+            return
+
+        label_size = self.image_label.size()
+        fitted = self._pixmap.size().scaled(
+            label_size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+        )
+        if fitted.height() <= 0:
+            return
+
+        self._zoom_factor = label_size.height() / fitted.height()
+        self._zoom_factor = max(self._ZOOM_MIN, min(self._ZOOM_MAX, self._zoom_factor))
+        self._pan_offset = QPointF(0, 0)
+        self._update_image()
+
     def zoom_in(self):
         """ズームイン"""
         self._zoom_factor = min(self._zoom_factor * self._ZOOM_STEP, self._ZOOM_MAX)
@@ -236,6 +272,11 @@ class ImageViewer(QFrame):
             max(-max_dx, min(max_dx, self._pan_offset.x())),
             max(-max_dy, min(max_dy, self._pan_offset.y())),
         )
+
+    def move_pan(self, dx: float, dy: float):
+        """パンオフセットを移動"""
+        self._pan_offset += QPointF(dx, dy)
+        self._update_image()
 
     def _update_image(self):
         """画像をラベルサイズとズーム倍率に合わせて描画する"""

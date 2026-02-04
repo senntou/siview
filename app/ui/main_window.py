@@ -416,6 +416,13 @@ class MainWindow(QWidget):
             ("Shift", Qt.Key.Key_H): self._focus_left,
             ("Shift", Qt.Key.Key_L): self._focus_right,
             ("Shift", Qt.Key.Key_R): self._show_host_dialog,
+
+            ("Ctrl", Qt.Key.Key_Q): self.close,
+
+            ("Ctrl", Qt.Key.Key_N,): self._next_image,
+            ("Ctrl", Qt.Key.Key_P,): self._prev_image,
+            (Qt.Key.Key_S,): self.image_viewer.zoom_to_fit_width,
+            (Qt.Key.Key_A,): self.image_viewer.zoom_to_fit_height,
         }
 
         # モード別キーマップ
@@ -436,8 +443,8 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_Minus,): lambda: self._change_font_size(-2),
             },
             "image_viewer": {
-                (Qt.Key.Key_J,): self._next_image,
-                (Qt.Key.Key_K,): self._prev_image,
+                (Qt.Key.Key_J,): lambda: self.image_viewer.move_pan(0, -30),
+                (Qt.Key.Key_K,): lambda: self.image_viewer.move_pan(0, 30),
                 (Qt.Key.Key_D,): self._remove_current_image,
                 (Qt.Key.Key_Y,): self.image_viewer._copy_image,
             },
