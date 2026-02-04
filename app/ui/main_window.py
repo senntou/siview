@@ -2,6 +2,7 @@ from PySide6.QtGui import QFont, QFontMetrics, QIcon, QImage
 from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 
+from image.cache import ImageCache
 from ui.thread.workers import HTTPFileWorker, HTTPListWorker, ServerConnectWorker
 from ui.host_dialog import HostDialog
 from const import FONT_SIZE
@@ -48,6 +49,7 @@ class MainWindow(QWidget):
         # 画像パスリスト
         self._image_paths: list[str] = []
         self._current_image_index: int = -1
+        self.image_cache = ImageCache()
 
         # UI コンポーネント
         self._current_display_path = ""  # 省略表示用にフルパスを保持
@@ -393,14 +395,22 @@ class MainWindow(QWidget):
         if self.client is None:
             return
 
+        # cacheがあればcacheを使う
+        cached_image = self.image_cache.get(remote_path)
+        if cached_image is not None:
+            self.image_viewer.set_image(cached_image)
+            return
+
         self._file_worker = HTTPFileWorker(self.client, remote_path, self)
-        self._file_worker.finished.connect(self._on_file_loaded)
+        self._file_worker.finished.connect(lambda img, fn=remote_path: self._on_file_loaded(img, fn, remote_path))
         self._file_worker.error.connect(self._on_file_error)
         self._file_worker.start()
 
-    def _on_file_loaded(self, image: QImage, filename: str):
+    def _on_file_loaded(self, image: QImage, filename: str, remote_path: str):
         """ファイル読み込み完了時のコールバック"""
         self.image_viewer.set_image(image)
+        # キャッシュに保存
+        self.image_cache.insert(remote_path, image)
 
     def _on_file_error(self, error_msg: str):
         """ファイル読み込みエラー時のコールバック"""
