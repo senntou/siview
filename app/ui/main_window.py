@@ -411,7 +411,6 @@ class MainWindow(QWidget):
 
         # グローバルキーマップ（全モード共通）
         self._global_keymap = {
-            (Qt.Key.Key_Q,): self.close,
             ("Ctrl", Qt.Key.Key_H): lambda: self._move_splitter(-3),
             ("Ctrl", Qt.Key.Key_L): lambda: self._move_splitter(3),
             ("Shift", Qt.Key.Key_H): self._focus_left,
