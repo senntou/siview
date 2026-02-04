@@ -1,4 +1,4 @@
-from PySide6.QtGui import QFont, QFontMetrics, QImage
+from PySide6.QtGui import QFont, QFontMetrics, QIcon, QImage
 from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 
@@ -11,7 +11,7 @@ from api.client import HTTPClient
 from state.manager import StateManager
 from ui.file_list_panel import FileListPanel
 from ui.image_viewer import ImageViewer
-from util.loader import load_stylesheet
+from util.loader import resource_path
 
 
 class MainWindow(QWidget):
@@ -20,6 +20,8 @@ class MainWindow(QWidget):
 
         self.host = host
         self.setWindowTitle(f"SIView - {host}")
+        icon_path = resource_path("icon.ico")
+        self.setWindowIcon(QIcon(icon_path))
         self.setGeometry(100, 100, 800, 600)
         self.setStyleSheet("""
             #imageLabel {

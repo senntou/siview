@@ -17,6 +17,7 @@ a = Analysis(
 pyz = PYZ(a.pure)
 
 a.datas += [(('siview-server-linux-amd64', '.\\siview-server-linux-amd64', 'DATA'))]
+a.datas += [(('icon.ico', '.\\icon.ico', 'DATA'))]
 
 exe = EXE(
     pyz,

@@ -11,16 +11,12 @@ import os
 import select
 import threading
 import socketserver
-import sys
 from pathlib import Path
 from typing import Callable
 
 import paramiko
 
-def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path) # type: ignore
-    return os.path.join(os.path.abspath("."), relative_path)
+from util.loader import resource_path
 
 class ServerManager:
     """
