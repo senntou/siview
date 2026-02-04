@@ -7,6 +7,9 @@ from PySide6.QtCore import QByteArray, QSize, Qt
 
 
 class ImageLoader:
+ 
+    EXTENSIONS = [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".svg"]
+
     def __init__(self, return_pixmap: bool = False):
         """
         return_pixmap=True にすると QPixmap を返す
