@@ -416,10 +416,6 @@ class MainWindow(QWidget):
             ("Shift", Qt.Key.Key_H): self._focus_left,
             ("Shift", Qt.Key.Key_L): self._focus_right,
             ("Shift", Qt.Key.Key_R): self._show_host_dialog,
-            ("Shift", Qt.Key.Key_Plus,): lambda: self._change_font_size(2),
-            (Qt.Key.Key_Semicolon,): lambda: self._change_font_size(2),
-            ("Shift", Qt.Key.Key_Equal,): lambda: self._change_font_size(-2),
-            (Qt.Key.Key_Minus,): lambda: self._change_font_size(-2),
         }
 
         # モード別キーマップ
@@ -433,6 +429,11 @@ class MainWindow(QWidget):
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
+
+                ("Shift", Qt.Key.Key_Plus,): lambda: self._change_font_size(2),
+                (Qt.Key.Key_Semicolon,): lambda: self._change_font_size(2),
+                ("Shift", Qt.Key.Key_Equal,): lambda: self._change_font_size(-2),
+                (Qt.Key.Key_Minus,): lambda: self._change_font_size(-2),
             },
             "image_viewer": {
                 (Qt.Key.Key_J,): self._next_image,

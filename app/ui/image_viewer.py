@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QTextEdit, QVBoxLayout, QSizePolicy
-from PySide6.QtGui import QFont, QFontMetrics, QGuiApplication, QPixmap, QImage
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont, QFontMetrics, QGuiApplication, QPainter, QPixmap, QImage
+from PySide6.QtCore import QEvent, QPointF, Qt, QTimer
 
 from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT, FONT_SIZE, TEXT_DEFAULT
 
@@ -8,12 +8,20 @@ from const import BG_DEFAULT, BG_FOCUSED, BORDER_FOCUSED, BORDER_DEFAULT, FONT_S
 class ImageViewer(QFrame):
     """画像とテキストを表示するビューア"""
 
+    _ZOOM_STEP = 1.25
+    _ZOOM_MIN = 0.1
+    _ZOOM_MAX = 10.0
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.setObjectName("imageViewer")
         self._pixmap: QPixmap | None = None
         self._is_focused: bool = False
+        self._zoom_factor: float = 1.0
+        self._pan_offset = QPointF(0, 0)
+        self._drag_start: QPointF | None = None
+        self._drag_offset_start: QPointF | None = None
 
         # 枠線設定
         self.setFrameShape(QFrame.Shape.Box)
@@ -37,6 +45,8 @@ class ImageViewer(QFrame):
         self.image_label.setObjectName("imageLabel")
         self.image_label.setMinimumSize(1, 1)
         self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.image_label.setMouseTracking(True)
+        self.image_label.installEventFilter(self)
 
         # ファイル名表示
         self.filename_label = QLabel()
@@ -78,6 +88,8 @@ class ImageViewer(QFrame):
             raise TypeError("Unsupported image type")
 
         self._pixmap = pixmap
+        self._zoom_factor = 1.0
+        self._pan_offset = QPointF(0, 0)
         self._update_image()
 
     def set_focused(self, focused: bool):
@@ -141,6 +153,8 @@ class ImageViewer(QFrame):
     def clear_image(self):
         """画像をクリア"""
         self._pixmap = None
+        self._zoom_factor = 1.0
+        self._pan_offset = QPointF(0, 0)
         self.image_label.clear()
         self.filename_label.setText("")
 
@@ -167,17 +181,99 @@ class ImageViewer(QFrame):
         super().resizeEvent(event)
         self._update_image()
 
+    def eventFilter(self, obj, event):
+        """image_label 上のマウス操作を処理する"""
+        if obj is not self.image_label:
+            return super().eventFilter(obj, event)
+
+        t = event.type()
+
+        # ホイールでズーム
+        if t == QEvent.Type.Wheel:
+            if event.angleDelta().y() > 0:
+                self.zoom_in()
+            else:
+                self.zoom_out()
+            return True
+
+        # 左ボタン押下でドラッグ開始
+        if t == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = event.position()
+            self._drag_offset_start = QPointF(self._pan_offset)
+            self.image_label.setCursor(Qt.CursorShape.ClosedHandCursor)
+            return True
+
+        # ドラッグ中
+        if t == QEvent.Type.MouseMove and self._drag_start is not None:
+            delta = event.position() - self._drag_start
+            self._pan_offset = self._drag_offset_start + delta
+            self._update_image()
+            return True
+
+        # ドラッグ終了
+        if t == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = None
+            self.image_label.setCursor(Qt.CursorShape.ArrowCursor)
+            return True
+
+        return super().eventFilter(obj, event)
+
+    def zoom_in(self):
+        """ズームイン"""
+        self._zoom_factor = min(self._zoom_factor * self._ZOOM_STEP, self._ZOOM_MAX)
+        self._update_image()
+
+    def zoom_out(self):
+        """ズームアウト"""
+        self._zoom_factor = max(self._zoom_factor / self._ZOOM_STEP, self._ZOOM_MIN)
+        self._update_image()
+
+    def _clamp_pan_offset(self, image_w: float, image_h: float, label_w: float, label_h: float):
+        """パンオフセットを画像がはみ出しすぎないように制限する"""
+        max_dx = max(0, (image_w - label_w) / 2)
+        max_dy = max(0, (image_h - label_h) / 2)
+        self._pan_offset = QPointF(
+            max(-max_dx, min(max_dx, self._pan_offset.x())),
+            max(-max_dy, min(max_dy, self._pan_offset.y())),
+        )
+
     def _update_image(self):
-        """画像をラベルサイズに合わせてスケーリング"""
+        """画像をラベルサイズとズーム倍率に合わせて描画する"""
         if self._pixmap is None:
             return
 
-        scaled = self._pixmap.scaled(
-            self.image_label.size(),
+        label_size = self.image_label.size()
+        label_w, label_h = label_size.width(), label_size.height()
+
+        # フィットサイズとズーム後の論理サイズを算出
+        fitted = self._pixmap.size().scaled(
+            label_size,
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
         )
-        self.image_label.setPixmap(scaled)
+        zoomed_w = fitted.width() * self._zoom_factor
+        zoomed_h = fitted.height() * self._zoom_factor
+
+        # パンオフセットをクランプ
+        self._clamp_pan_offset(zoomed_w, zoomed_h, label_w, label_h)
+
+        # 元画像→ズーム後のスケール比
+        scale = zoomed_w / self._pixmap.width()
+
+        # ズーム後画像の左上座標（ラベル座標系）
+        img_x = (label_w - zoomed_w) / 2 + self._pan_offset.x()
+        img_y = (label_h - zoomed_h) / 2 + self._pan_offset.y()
+
+        # 座標変換で元画像を直接描画（キャンバス外は自動クリップ）
+        canvas = QPixmap(label_size)
+        canvas.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(canvas)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.translate(img_x, img_y)
+        painter.scale(scale, scale)
+        painter.drawPixmap(0, 0, self._pixmap)
+        painter.end()
+
+        self.image_label.setPixmap(canvas)
 
     def _set_label_font(self, label: QLabel, size: int):
         """ラベルにフォントサイズと高さを設定（Windows対応）"""
