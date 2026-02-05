@@ -489,21 +489,21 @@ class MainWindow(QWidget):
 
     def _exec_cd(self, path: str):
         """cdコマンド: 指定パスへ移動"""
-        if self.client is None or self.current_path is None:
+        if self.client is None or self.current_path is None or self.manager is None:
             self.image_viewer.set_text("サーバー未接続")
             return
 
-        if not path or path == "~":
-            # 引数なし or ~ → ホームディレクトリ
-            target = self._home_dir or "/"
-        elif path.startswith("~/"):
-            target = posixpath.join(self._home_dir or "/", path[2:])
-        elif path.startswith("/"):
+        if path == "":
+           target = "~"
+        elif path.startswith("/") or path.startswith("~"):
             target = path
         else:
             target = posixpath.join(self.current_path, path)
 
-        target = posixpath.normpath(target)
+        target = self.manager.resolve_remote_path(target)
+        if target is None:
+            self.image_viewer.set_text(f"パス解決エラー: {path}")
+            return
         self.current_path = target
         self._refresh_file_list()
 

@@ -236,6 +236,14 @@ class ServerManager:
         )
         self._tunnel_thread.start()
 
+    def resolve_remote_path(self, path: str) -> str | None:
+        """リモートにディレクトリが存在するか確認し、存在しなければNoneを返す"""
+        if not self.ssh:
+            raise RuntimeError("SSH connection not established")
+        _, stdout, _ = self.ssh.exec_command(f"cd {path} && pwd")
+        out = stdout.read().decode().strip()
+        return out if out else None
+
     def cleanup(self):
         """リソースのクリーンアップ"""
         # トンネルを停止
