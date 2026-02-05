@@ -451,6 +451,7 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_L,): self._enter_directory,
                 (Qt.Key.Key_O,): self._add_image_to_list,
                 (Qt.Key.Key_Y,): self._copy_current_path,
+                (Qt.Key.Key_F,): lambda: self.command_overlay.activate("filter "),
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
@@ -485,6 +486,10 @@ class MainWindow(QWidget):
 
         if cmd == "cd":
             self._exec_cd(parts[1] if len(parts) > 1 else "")
+        elif cmd == "filter":
+            self._exec_filter(parts[1] if len(parts) > 1 else "")
+        elif cmd == "noh":
+            self.file_list_panel.clear_filter()
         else:
             self.image_viewer.set_text(f"unknown command: {command}")
 
@@ -507,6 +512,10 @@ class MainWindow(QWidget):
             return
         self.current_path = target
         self._refresh_file_list()
+
+    def _exec_filter(self, pattern: str):
+        """filterコマンド: 部分一致でファイルリストをフィルタ"""
+        self.file_list_panel.set_filter(pattern)
 
     def _copy_current_path(self):
         """選択中ファイルのフルパスをクリップボードにコピー"""

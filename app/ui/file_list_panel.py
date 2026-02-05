@@ -8,6 +8,7 @@ from const import (
     BORDER_FOCUSED, BORDER_DEFAULT, ITEM_SELECTED_BG
 )
 from ui.model.file_list_model import FileListModel
+from ui.delegate.highlight_delegate import HighlightDelegate
 
 
 class FileListPanel(QFrame):
@@ -33,6 +34,10 @@ class FileListPanel(QFrame):
         self._list_view.setModel(self._model)
         self._list_view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
 
+        # ハイライト用デリゲート
+        self._delegate = HighlightDelegate(self._list_view)
+        self._list_view.setItemDelegate(self._delegate)
+
         # スクロールバーを非表示
         self._list_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._list_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -42,7 +47,9 @@ class FileListPanel(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._list_view)
 
-        self._entries: list[dict] = []  # ファイル情報を保持（name, is_dir）
+        self._all_entries: list[dict] = []  # 全エントリ（フィルタ前）
+        self._entries: list[dict] = []  # 表示中エントリ（フィルタ後）
+        self._filter_pattern: str = ""
 
         self._update_style(False)
         # 初期フォントサイズを設定（Windowsではスタイルシートが効かないため）
@@ -91,27 +98,45 @@ class FileListPanel(QFrame):
 
     def set_entries(self, entries: list[dict], idx: int = 0):
         """ファイルエントリを設定して表示を更新"""
-        self._entries = entries
-
         # ディレクトリ > ファイルの順にソート、名前順にソート
         natkey = natsort_keygen(key=lambda s: s.lower())
         entries.sort(
             key=lambda e: (not e["is_dir"], natkey(e["name"]))
         )
 
-        # 表示用の文字列リストを作成
-        display_list = []
-        for entry in entries:
-            name = entry["name"]
-            is_dir = entry["is_dir"]
-            display_name = f"{name}/" if is_dir else name
-            display_list.append(display_name)
-
-        self._model.set_entries(entries)
+        self._all_entries = entries
+        self._filter_pattern = ""  # フィルタをリセット
+        self._apply_filter()
 
         # カーソル位置を設定
-        if len(display_list) > 0:
+        if self._model.rowCount() > 0:
             self.set_current_row(idx)
+
+    def _apply_filter(self):
+        """現在のフィルタパターンを適用して表示を更新"""
+        if self._filter_pattern:
+            pattern = self._filter_pattern.lower()
+            self._entries = [e for e in self._all_entries if pattern in e["name"].lower()]
+        else:
+            self._entries = self._all_entries
+
+        self._model.set_entries(self._entries)
+        self._delegate.set_highlight_pattern(self._filter_pattern)
+
+    def set_filter(self, pattern: str):
+        """フィルタパターンを設定して表示を更新"""
+        self._filter_pattern = pattern.strip()
+        self._apply_filter()
+
+        # カーソルを先頭に移動
+        if self._model.rowCount() > 0:
+            self.set_current_row(0)
+
+    def clear_filter(self):
+        """フィルタをクリア"""
+        self._filter_pattern = ""
+        self._apply_filter()
+        self._list_view.viewport().update()  # 再描画
 
     def set_message(self, message: str):
         """単一メッセージを表示（ローディング、エラー等）"""

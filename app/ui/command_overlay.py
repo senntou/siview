@@ -49,13 +49,14 @@ class CommandOverlay(QWidget):
 
         self.setFixedHeight(36)
 
-    def activate(self):
+    def activate(self, initial_text: str = ""):
         """オーバーレイを表示してフォーカスを設定"""
-        self._input.clear()
+        self._input.setText(initial_text)
         self._reposition()
         self.show()
         self.raise_()
         self._input.setFocus()
+        self._input.setCursorPosition(len(initial_text))
 
     def _on_accept(self):
         """Enter押下時: コマンドを発行して閉じる"""
