@@ -1,7 +1,7 @@
 import posixpath
 
 from PySide6.QtGui import QFont, QFontMetrics, QIcon, QImage
-from PySide6.QtWidgets import QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 from PySide6.QtCore import Qt
 
 from image.cache import ImageCache
@@ -450,6 +450,7 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_H,): self._go_parent,
                 (Qt.Key.Key_L,): self._enter_directory,
                 (Qt.Key.Key_O,): self._add_image_to_list,
+                (Qt.Key.Key_Y,): self._copy_current_path,
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
@@ -506,6 +507,25 @@ class MainWindow(QWidget):
             return
         self.current_path = target
         self._refresh_file_list()
+
+    def _copy_current_path(self):
+        """選択中ファイルのフルパスをクリップボードにコピー"""
+        if self.current_path is None:
+            return
+
+        entry = self.file_list_panel.current_entry()
+        if entry is None:
+            return
+
+        name = entry["name"]
+        if self.current_path == "/":
+            full_path = f"/{name}"
+        else:
+            full_path = f"{self.current_path}/{name}"
+
+        QApplication.clipboard().setText(full_path)
+        self.file_list_panel.flash_border()
+        self.image_viewer.show_temp_message(f"クリップボードにコピーしました：{full_path}")
 
     def keyPressEvent(self, event):
         """Vim風キーバインド（モード対応）"""

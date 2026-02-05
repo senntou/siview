@@ -1,7 +1,9 @@
 import os
+import signal
 import sys
 
 import PySide6
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from state.manager import StateManager
@@ -16,6 +18,13 @@ def main():
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = plugin_path
 
     app = QApplication(sys.argv)
+
+    # SIGINT(Ctrl+C)でアプリを終了できるようにする
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    # Qtイベントループ中も定期的にPythonに制御を戻す
+    timer = QTimer()
+    timer.timeout.connect(lambda: None)
+    timer.start(100)
 
     # ホスト名の決定: 前回のホスト > ダイアログ
     state = StateManager()

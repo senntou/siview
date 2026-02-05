@@ -119,12 +119,18 @@ class ImageViewer(QFrame):
 
     def _show_copy_feedback(self):
         """コピー完了のフィードバックを表示"""
-        # 枠をフラッシュ
+        self.show_flash_message("クリップボードにコピーしました")
+
+    def show_flash_message(self, message: str, duration: int = 1500):
+        """一時的なメッセージを表示し、枠をフラッシュ"""
         self._flash_border()
-        # テキストを一時的に表示
-        original_text = self.text_view.toPlainText()
-        self.text_view.setPlainText("クリップボードにコピーしました")
-        QTimer.singleShot(1500, lambda: self.text_view.setPlainText(original_text))
+        self.show_temp_message(message, duration)
+
+    def show_temp_message(self, message: str, duration: int = 1500):
+        """一時的なメッセージを表示（枠フラッシュなし）"""
+        # original_text = self.text_view.toPlainText()
+        self.text_view.setPlainText(message)
+        QTimer.singleShot(duration, lambda: self.text_view.setPlainText(""))
 
     def _flash_border(self):
         """枠を一時的にハイライト"""

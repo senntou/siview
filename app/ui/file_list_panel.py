@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QFrame, QListView, QVBoxLayout
 from PySide6.QtGui import QFont
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from natsort import natsort_keygen
 
 from const import (
@@ -163,3 +163,10 @@ class FileListPanel(QFrame):
     def entry_count(self) -> int:
         """エントリ数を取得"""
         return len(self._entries)
+
+    def flash_border(self):
+        """枠を一時的にハイライト"""
+        flash_color = "#FFFF00"
+        bg = BG_FOCUSED if self._is_focused else BG_DEFAULT
+        self.setStyleSheet(f"#fileListPanel {{ border: 4px solid {flash_color}; background-color: {bg}; }}")
+        QTimer.singleShot(300, lambda: self._update_style(self._is_focused))

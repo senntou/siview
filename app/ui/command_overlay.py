@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 
 from const import BG_DEFAULT, BORDER_FOCUSED, TEXT_DEFAULT
 
@@ -44,6 +44,7 @@ class CommandOverlay(QWidget):
             }}
         """)
         self._input.returnPressed.connect(self._on_accept)
+        self._input.installEventFilter(self)  # フォーカスアウト監視
         layout.addWidget(self._input)
 
         self.setFixedHeight(36)
@@ -64,12 +65,19 @@ class CommandOverlay(QWidget):
             self.command_accepted.emit(text)
 
     def keyPressEvent(self, event):
-        """Escapeで入力を破棄して閉じる"""
+        """EscapeまたはCtrl+Cで入力を破棄して閉じる"""
         if event.key() == Qt.Key.Key_Escape:
             self.hide()
             self.parent().setFocus()
             return
         super().keyPressEvent(event)
+
+    def eventFilter(self, obj, event):
+        """入力欄からフォーカスが外れたら自動で閉じる"""
+        if obj is self._input and event.type() == QEvent.Type.FocusOut:
+            self.hide()
+            self.parent().setFocus()
+        return super().eventFilter(obj, event)
 
     def _reposition(self):
         """親ウィジェットの中央に配置"""
