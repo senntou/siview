@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QSizePolicy, QSplitter, QVBo
 from PySide6.QtCore import Qt
 
 from image.cache import ImageCache
-from ui.thread.workers import HTTPFileWorker, HTTPListWorker, ServerConnectWorker
+from ui.thread.workers import HTTPFileWorker, HTTPListWorker, ServerConnectWorker, ZoxideAddWorker
 from ui.host_dialog import HostDialog
 from const import FONT_SIZE
 
@@ -452,6 +452,7 @@ class MainWindow(QWidget):
                 (Qt.Key.Key_O,): self._add_image_to_list,
                 (Qt.Key.Key_Y,): self._copy_current_path,
                 (Qt.Key.Key_F,): lambda: self.command_overlay.activate("filter "),
+                (Qt.Key.Key_Z,): lambda: self.command_overlay.activate("z "),
                 ("Ctrl", Qt.Key.Key_D): lambda: self.file_list_panel.move_cursor(15),
                 ("Ctrl", Qt.Key.Key_U): lambda: self.file_list_panel.move_cursor(-15),
                 ("Shift", Qt.Key.Key_G): self.file_list_panel.go_bottom,
@@ -486,6 +487,8 @@ class MainWindow(QWidget):
 
         if cmd == "cd":
             self._exec_cd(parts[1] if len(parts) > 1 else "")
+        elif cmd == "z":
+            self._exec_z(parts[1] if len(parts) > 1 else "")
         elif cmd == "filter":
             self._exec_filter(parts[1] if len(parts) > 1 else "")
         elif cmd == "noh":
@@ -512,6 +515,32 @@ class MainWindow(QWidget):
             return
         self.current_path = target
         self._refresh_file_list()
+        self._zoxide_add_async(target)
+
+    def _exec_z(self, query: str):
+        """zコマンド: zoxide queryで移動先を解決して移動"""
+        if self.client is None or self.current_path is None or self.manager is None:
+            self.image_viewer.set_text("サーバー未接続")
+            return
+
+        if query == "":
+            self.image_viewer.set_text("zoxide: クエリを指定してください")
+            return
+
+        target = self.manager.zoxide_query(query)
+        if target is None:
+            self.image_viewer.set_text(f"zoxide: 一致するパスなし: {query}")
+            return
+        self.current_path = target
+        self._refresh_file_list()
+        self._zoxide_add_async(target)
+
+    def _zoxide_add_async(self, path: str):
+        """非同期でリモートのzoxide addを実行する"""
+        if self.manager is None:
+            return
+        self._zoxide_worker = ZoxideAddWorker(self.manager, path, self)
+        self._zoxide_worker.start()
 
     def _exec_filter(self, pattern: str):
         """filterコマンド: 部分一致でファイルリストをフィルタ"""

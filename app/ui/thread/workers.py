@@ -52,6 +52,21 @@ class HTTPListWorker(QThread):
             self.error.emit(str(e))
 
 
+class ZoxideAddWorker(QThread):
+    """非同期でリモートのzoxide addを実行するワーカー"""
+
+    def __init__(self, manager, path: str, parent=None):
+        super().__init__(parent)
+        self.manager = manager
+        self.path = path
+
+    def run(self):
+        try:
+            self.manager.zoxide_add(self.path)
+        except Exception:
+            pass
+
+
 class HTTPFileWorker(QThread):
     """ファイルを取得して画像として読み込むワーカースレッド"""
     finished = Signal(QImage, str)  # (image, filename)

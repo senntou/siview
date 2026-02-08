@@ -244,6 +244,23 @@ class ServerManager:
         out = stdout.read().decode().strip()
         return out if out else None
 
+    def zoxide_query(self, query: str) -> str | None:
+        """zoxide queryでパスを解決する。失敗時はNoneを返す"""
+        if not self.ssh:
+            raise RuntimeError("SSH connection not established")
+        _, stdout, stderr = self.ssh.exec_command(f'bash -lc "zoxide query {query}"')
+        out = stdout.read().decode().strip()
+        return out if out else None
+
+    def zoxide_add(self, path: str) -> None:
+        """zoxide addを実行する。エラーは無視する"""
+        if not self.ssh:
+            return
+        try:
+            self.ssh.exec_command(f"zoxide add {path}")
+        except Exception:
+            pass
+
     def cleanup(self):
         """リソースのクリーンアップ"""
         # トンネルを停止
