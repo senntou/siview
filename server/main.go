@@ -54,11 +54,7 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-	root = home
+	root = "/"
 
 	http.HandleFunc("/api/list", listHandler)
 	http.Handle("/file/",

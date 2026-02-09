@@ -100,22 +100,14 @@ class HTTPClient:
 
     def _to_relative_path(self, abs_path: str) -> str:
         """
-        絶対パスをホームディレクトリからの相対パスに変換
+        絶対パスをサーバーのルート（/）からの相対パスに変換
 
-        例: /home/user/foo → foo (home_dir が /home/user の場合)
+        例: /home/user/foo → home/user/foo
         """
-        # パスを正規化（リモートは常にPOSIXパス）
         abs_path = posixpath.normpath(abs_path)
-
-        # ホームディレクトリからの相対パス
-        if abs_path.startswith(self._home_dir):
-            rel = abs_path[len(self._home_dir):]
-            if rel.startswith("/"):
-                rel = rel[1:]
-            return rel if rel else "."
-        else:
-            # ホームディレクトリ外のパスはそのまま返す（エラーになる可能性あり）
-            return abs_path
+        if abs_path.startswith("/"):
+            return abs_path[1:] or "."
+        return abs_path
 
     # with 構文対応
     def __enter__(self):
