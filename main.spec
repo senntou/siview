@@ -17,7 +17,7 @@ a = Analysis(
 pyz = PYZ(a.pure)
 
 a.datas += [(('siview-server-linux-amd64', '.\\siview-server-linux-amd64', 'DATA'))]
-a.datas += [(('icon.ico', '.\\icon.ico', 'DATA'))]
+a.datas += [(('icon_v2.ico', '.\\icon_v2.ico', 'DATA'))]
 
 exe = EXE(
     pyz,
@@ -35,7 +35,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
+    icon=['icon_v2.ico'],
 )
 coll = COLLECT(
     exe,
