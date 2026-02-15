@@ -423,6 +423,25 @@ class MainWindow(QWidget):
         """ファイル読み込みエラー時のコールバック"""
         self.image_viewer.set_text(f"画像読み込みエラー: {error_msg}")
 
+    def _reload_current_image(self):
+        """現在表示中の画像をキャッシュから削除して再取得する"""
+        if not self._image_paths or self._current_image_index < 0 or self.client is None:
+            return
+
+        remote_path = self._image_paths[self._current_image_index]
+
+        # キャッシュから削除
+        self.image_cache.remove(remote_path)
+
+        # 画像をクリアして背景のみ表示（フェッチ中は画像が消える）
+        self.image_viewer.clear_image()
+        filename = remote_path.split("/")[-1]
+        self.image_viewer.set_filename(filename)
+        self.image_viewer.set_pagination(self._current_image_index, len(self._image_paths))
+
+        # 再フェッチ
+        self._load_image(remote_path)
+
     def _init_keymap(self):
         self._pending_key = None
 
@@ -438,6 +457,7 @@ class MainWindow(QWidget):
 
             ("Ctrl", Qt.Key.Key_N,): self._next_image,
             ("Ctrl", Qt.Key.Key_P,): self._prev_image,
+            (Qt.Key.Key_R,): self._reload_current_image,
             (Qt.Key.Key_S,): self.image_viewer.zoom_to_fit_width,
             (Qt.Key.Key_A,): self.image_viewer.zoom_to_fit_height,
         }

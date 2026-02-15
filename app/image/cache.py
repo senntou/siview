@@ -31,6 +31,18 @@ class ImageCache:
 
         self._evict_if_needed()
 
+    def remove(self, path: str) -> None:
+        """指定パスのキャッシュを削除する"""
+        img = self._images.pop(path, None)
+        if img is None:
+            return
+        bytes_ = img.sizeInBytes()
+        self._current_bytes -= bytes_
+        # dequeから該当エントリを除去
+        self._queue = deque(
+            (p, b) for p, b in self._queue if p != path
+        )
+
     def clear(self) -> None:
         self._images.clear()
         self._queue.clear()
